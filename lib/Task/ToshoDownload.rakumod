@@ -56,6 +56,16 @@ method parse-page($response) {
     say "Got response $response";
     say "status was { $response.status }";
     my $dom = DOM::Tiny.parse(await $response.body);
+
+    if $dom.find('div#content > table').elems == 2 {
+        self.queue-download-single-file($dom);
+    } else {
+        self.queue-download-multiple-files($dom);
+    }
+}
+
+# This page is for downloading a single-file, perhaps split into parts
+method queue-download-single-file($dom) {
     # For a page describing a single file, the download links are in the second table
     my $download-table = $dom.find('div#content > table')[1];
     say "Extracted download-table: $download-table";
@@ -77,6 +87,30 @@ method parse-page($response) {
                                                queue => self.queue));
 }
 
+# This page is for downloading multiple files grouped together. Each file
+# might be split into parts
+method queue-download-multiple-files($dom) {
+    my @file-divs = $dom.find('div.view_list_entry');
+    say "There are { @file-divs.elems } files on this page";
+
+    for @file-divs -> $file-div {
+        my $filename-link = $file-div.find('a[href*="animetosho.org"]')[0];
+        my @zippy-share-links = $file-div.find('a[href*="zippyshare.com"]');
+
+        say "\t{ $filename-link.text }: { @zippy-share-links.elems } parts";
+
+        my $part-num = 1;
+        my @child-tasks = map { Task::FileDownloader::ZippyShare.new(
+                                    filename => sprintf('%s.%03d', $filename-link.text, $part-num++),
+                                    url => $_.attr('href'),
+                                    queue => self.queue)
+                              }, @zippy-share-links;
+
+        $.queue.send($_) for @child-tasks;
+        $.queue.send(Task::MultipartFileJoiner.new(filename => $filename-link.text,
+                                                   file-part-tasks => @child-tasks,
+                                                   queue => self.queue));
+    }
+}
+
 method gist { "Task::ToshoDownload($.url)" }
-    
-    
