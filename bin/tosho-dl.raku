@@ -1,11 +1,14 @@
 #!/usr/local/bin/raku
 
 use Worker;
-use Task::Echo;
+use Task::ToshoDownload;
 
 sub MAIN(
     Int $workers? = 5,
 ) {
+    # This is used by the file downloader to store files as they're being processed
+    mkdir 'working';
+
     say "hi";
     my $work-queue = Channel.new();
 
@@ -20,7 +23,7 @@ sub MAIN(
     react {
         whenever $*IN.lines.Supply -> $line {
             say "read line: $line";
-            my $task = Task::Echo.new(queue => $work-queue, message => $line);
+            my $task = Task::ToshoDownload.new(queue => $work-queue, url => $line);
             $work-queue.send($task);
         }
     }

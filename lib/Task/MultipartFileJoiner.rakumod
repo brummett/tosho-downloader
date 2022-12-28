@@ -1,0 +1,50 @@
+use Task;
+
+unit class Task::MultipartFileJoiner is Task;
+
+has Str $.filename;
+has Task @.file-part-tasks;
+
+method run {
+    for @.file-part-tasks -> $task {
+        if not $task.is-done {
+            # At least one child is still running.
+            # Reschedule myself and check again later
+            await Promise.in(1);
+            $.queue.send(self);
+            return;
+        }
+    }
+
+    say "All parts of $.filename are done";
+
+    if @.file-part-tasks.elems == 1 {
+        # just one part, move the file
+        say "  was just one part.  Moving to $.filename";
+        rename @.file-part-tasks[0].pathname, $.filename, :createonly;
+
+    } else {
+
+        # Join all the parts together
+        my $final-fh = open $.filename, :w, :bin;
+        for @.file-part-tasks -> $task {
+            say "  ",$task.pathname;
+            react { 
+                whenever $task.pathname.IO.open(:r, :bin).Supply -> $chunk {
+                    $final-fh.write($chunk);
+                }
+            }
+        }
+        $final-fh.close;
+        say "  ==> $.filename";
+
+        unlink $_.pathname for @.file-part-tasks;
+    }
+    
+    self.done;
+}
+
+method gist {
+    my @names = map { $_.filename }, @.file-part-tasks;
+    "Joiner for " ~ @names.join(', ');
+}
