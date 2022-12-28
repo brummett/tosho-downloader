@@ -90,15 +90,18 @@ class Task::FileDownloader::ZippyShare is Task::FileDownloader {
 
     method Xdo-download-file($client, $dl-uri) {
         say "Downloading from $.url =>  file $dl-uri";
-        my 
+        my $bytes-read = 0;
+        my $start-time = now;
         react {
             whenever $client.get($dl-uri) -> $response {
                 my $fh = open self.pathname, :w, :bin;
                 whenever $response.body-byte-stream -> $chunk {
+                    $bytes-read += $chunk.bytes;
                     $fh.write($chunk);
                 }
                 LAST {
-                    say "Done downloading $dl-uri";
+                    my $mbps = $bytes-read / 1024 / 1024 / (now - $start-time);
+                    printf("Done downloading $dl-uri: %.1f\n", $mbps);
                     $fh.close;
                 }
             }
