@@ -32,7 +32,12 @@ class Task::FileDownloader::ZippyShare is Task::FileDownloader {
                 }
                 QUIT {
                     default {
-                        note "$url failed: " ~ .message;
+                        note "**** $.filename: $url failed: " ~ .message;
+                    }
+                }
+                CATCH {
+                    default {
+                        note "**** $.filename: $url failed: " ~ .message;
                     }
                 }
             }
@@ -51,7 +56,7 @@ class Task::FileDownloader::ZippyShare is Task::FileDownloader {
 
         # The script does a thing like this:
         #   document.getElementById('dlbutton').href = "/d/RjdUFwva/" + (518720 % 51245 + 518720 % 913) + "blahblah"
-        if $script ~~ /'document.getElementById(\'dlbutton\').href = "' $<baseURL>=<-["]>+
+        if $script and $script ~~ /'document.getElementById(\'dlbutton\').href = "' $<baseURL>=<-["]>+
                         '" + ('
                         $<d1>=\d+
                         ' % '
@@ -69,7 +74,7 @@ class Task::FileDownloader::ZippyShare is Task::FileDownloader {
 
            return $download-path;
         } else {
-            die "Didn't find download link"
+            die "Didn't find download link on $url"
         }
     }
 

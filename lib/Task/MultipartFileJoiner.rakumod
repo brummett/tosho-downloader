@@ -18,6 +18,14 @@ method run {
 
     say "All parts of $.filename are done";
 
+    for @.file-part-tasks -> $task {
+        if not $task.pathname.IO.e {
+            note "*** At least one part of $.filename didn't download: ", $task.pathname;
+            self.done;
+            return;
+        }
+    }
+
     if @.file-part-tasks.elems == 1 {
         # just one part, move the file
         say "  was just one part.  Moving to $.filename";
@@ -40,7 +48,7 @@ method run {
 
         unlink $_.pathname for @.file-part-tasks;
     }
-    
+
     self.done;
 }
 
