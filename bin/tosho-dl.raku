@@ -1,6 +1,7 @@
 #!/usr/local/bin/raku
 
 use Worker;
+use ToshoFeed;
 use Task::ToshoDownload;
 
 sub MAIN(
@@ -10,6 +11,7 @@ sub MAIN(
     mkdir 'working';
 
     say "hi";
+    my %feed := TitleToToshoId.new();
     my $work-queue = Channel.new();
 
     #my @workers = map { Worker.new(id => $_, queue => $work-queue) }, ^$workers;
@@ -23,8 +25,12 @@ sub MAIN(
     react {
         whenever $*IN.lines.Supply -> $line {
             say "read line: $line";
-            my $task = Task::ToshoDownload.new(queue => $work-queue, url => $line);
-            $work-queue.send($task);
+            my $id = %feed{$line};
+            say "title $line is id $id";
+            if $id {
+                my $task = Task::ToshoDownload.new(queue => $work-queue, id => $id);
+                $work-queue.send($task);
+            }
         }
     }
     say "main, all done!"

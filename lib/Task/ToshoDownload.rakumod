@@ -2,10 +2,10 @@ use Task;
 
 unit class Task::ToshoDownload is Task;
 
-# Download a URL from AnimeTosho for a show or file, parse its contents
+# Download torrent ID from animetosho's feed API
 # and queue download tasks for each part of each file
 
-has Str $.url;
+has Int $.id;
 
 use Cro::HTTP::Client;
 use Cro::Uri;
@@ -14,122 +14,99 @@ use DOM::Tiny;
 use Task::FileDownloader;
 use Task::MultipartFileJoiner;
 
+my $client = Cro::HTTP::Client.new(base-uri => 'https://feed.animetosho.org/json',
+                                   timeout => { connection => 10, headers => 10 });
+
 method run {
-    say "Trying to get $.url";
-    my $client = Cro::HTTP::Client.new();
-    my $url = Cro::Uri.parse($.url);
-    my $response = await $client.get($url);
-    say "Got response from $url, status { $response.status }";
-    if $response.content-type.type-and-subtype eq 'text/html' {
-        self.parse-page($response);
+    say "Trying to get tosho id $.id from feed API";
+
+    my $num-retries = 5;
+
+    while $num-retries > 0 {
+        my $response = await $client.get('', query => { show => 'torrent', id => $.id });
+        say "Got response for $.id, status { $response.status }";
+        my $data = await $response.body();
+
+        # status can be "complete", "skipped", "processing"
+        if $data<status> ne 'complete' {
+            say "$data<title> is not yet complete: $data<status>";
+            self.done;
+            return;
+        }
+
+        if $data<num_files> == 1 {
+            self.queue-download-single-file($data<files>[0]);
+        } else {
+            self.queue-download-multiple-files($data<title>, $data<files>);
+        }
+
+        CATCH {
+            when X::Cro::HTTP::Client::Timeout {
+                $*ERR.say: "***** Timeout when getting id { $.id }: $_";
+                $num-retries--;
+                redo;
+            }
+            default {
+                $*ERR.say: "\n\n****** Caught exception { $_.^name } getting $.id: ",$_;
+                last;
+            }
+        }
+
         self.done;
+        return;
     }
-    CATCH {
-        default {
-            $*ERR.say: "\n\n****** Caught exception getting $.url: $_";
-        }
-    }
-}
-
-method XXrun {
-    say "Trying to get $.url";
-    my $response = await Cro::HTTP::Client.get($.url);
-
-    say "Response for $.url was { $response.status }";
-    self.parse-page($response);
-    self.done;
-
-    CATCH {
-        default {
-            $*ERR.say: "\n\n****** Caught exception getting $.url: $_";
-        }
-    }
-}
-
-method Xrun {
-    say "Trying to get $.url";
-    react {
-        my $client = Cro::HTTP::Client.new();
-        say "Created client $client";
-        my $url = Cro::Uri.parse( $.url );
-        say "parsed url $url";
-        whenever $client.get($url) -> $response {
-            if $response.content-type.type-and-subtype eq 'text/html' {
-                self.parse-page($response);
-            }
-            LAST {
-                self.done;
-            }
-            QUIT {
-                default {
-                    note "$url failed: " ~ .message;
-                }
-            }
-        }
-    }
-}
-
-method parse-page($response) {
-    say "Got response $response";
-    say "status was { $response.status }";
-    my $dom = DOM::Tiny.parse(await $response.body);
-
-    if $dom.find('div#content > table').elems == 2 {
-        self.queue-download-single-file($dom);
-    } else {
-        my $title = self.parse_title($dom);
-        say "Multi-file title: $title";
-        self.queue-download-multiple-files($title, $dom);
-    }
-}
-
-method parse_title($dom) {
-    $dom.find('h2#title')[0].text;
 }
 
 # This page is for downloading a single-file, perhaps split into parts
-method queue-download-single-file(DOM::Tiny $dom) {
-    # For a page describing a single file, the download links are in the second table
-    my $download-table = $dom.find('div#content > table')[1];
-    my $filename-link = $download-table.find('tr:first-of-type td a')[0];
+method queue-download-single-file($file) {
+    if $file<links><ZippyShare>.elems < 1 {
+        die "**** $file<filename> has no ZippyShare links";
+    }
 
-    my @zippy-share-links = $download-table.find('tr:nth-child(2) a[href*="zippyshare.com"]');
-
-    self.queue-download-one-of-the-files($filename-link, @zippy-share-links);
+    self.queue-download-one-of-the-files(filename => $file<filename>,
+                                         md5 => $file<md5>,
+                                         zippy-share-links => $file<links><ZippyShare>);
 }
 
 # This page is for downloading multiple files grouped together. Each file
 # might be split into parts
-method queue-download-multiple-files(Str $title, DOM::Tiny $dom) {
-    my @file-divs = $dom.find('div.view_list_entry');
-    say "There are { @file-divs.elems } files on this page";
+method queue-download-multiple-files(Str $title, @files) {
+    for @files -> $file {
+        if $file<links><ZippyShare>.elems < 1 {
+            die "**** $file<filename> has no ZippyShare links";
+        }
 
-    for @file-divs -> $file-div {
-        my $filename-link = $file-div.find('a[href*="animetosho.org"]')[0];
-        my @zippy-share-links = $file-div.find('a[href*="zippyshare.com"]');
-
-        self.queue-download-one-of-the-files($filename-link, @zippy-share-links, $title);
+        self.queue-download-one-of-the-files(filename => $file<filename>,
+                                             md5 => $file<md5>,
+                                             zippy-share-links => $file<links><ZippyShare>,
+                                             title => $title);
     }
 }
 
-method queue-download-one-of-the-files($filename-link, @zippy-share-links, Str $title?) {
-    say "\t{ $filename-link.text }: { @zippy-share-links.elems } parts";
+multi method queue-download-one-of-the-files(Str :$filename, Str :$zippy-share-links, Str :$md5, Str :$title?) {
+    self.queue-download-one-of-the-files(:$filename, zippy-share-links => [ $zippy-share-links ], :$md5, :$title)
+}
+
+multi method queue-download-one-of-the-files(Str :$filename, :@zippy-share-links, Str :$md5, Str :$title?) {
+    say "\t$filename: { @zippy-share-links.elems } parts";
+    say @zippy-share-links.^name, ": ", @zippy-share-links.raku;
 
     my $part-num = 1;
 
     # Multi-file torrents get binned by the title of the whole group
-    my $filename = $title ?? IO::Spec::Unix.catpath($, $title, $filename-link.text) !! $filename-link.text;
+    my $final-filename = $title ?? IO::Spec::Unix.catpath($, $title, $filename) !! $filename;
 
     my @child-tasks = map { Task::FileDownloader::ZippyShare.new(
-                                filename => sprintf('%s.%03d', $filename, $part-num++),
-                                url => $_.attr('href'),
+                                filename => sprintf('%s.%03d', $final-filename, $part-num++),
+                                url => $_,
                                 queue => self.queue)
                           }, @zippy-share-links;
 
     $.queue.send($_) for @child-tasks;
-    $.queue.send(Task::MultipartFileJoiner.new(filename => $filename,
+    $.queue.send(Task::MultipartFileJoiner.new(filename => $final-filename,
                                                file-part-tasks => @child-tasks,
+                                               md5 => $md5,
                                                queue => self.queue));
 }
 
-method gist { "Task::ToshoDownload($.url)" }
+method gist { "Task::ToshoDownload($.id)" }
