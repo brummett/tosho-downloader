@@ -1,9 +1,11 @@
 use Task;
+use Gcrypt::Simple :MD5;
 
 unit class Task::MultipartFileJoiner is Task;
 
 has Str $.filename;
 has Task @.file-part-tasks;
+has Str $.md5;
 
 method run {
     for @.file-part-tasks -> $task {
@@ -37,16 +39,23 @@ method run {
 
         # Join all the parts together
         my $final-fh = open $.filename, :w, :bin;
+        my $md5 = MD5;
+
         for @.file-part-tasks -> $task {
             say "  ",$task.pathname;
             react { 
                 whenever $task.pathname.IO.open(:r, :bin).Supply -> $chunk {
+                    $md5.write($chunk);
                     $final-fh.write($chunk);
                 }
             }
         }
         $final-fh.close;
+
         say "  ==> $.filename";
+        if $md5.hex ne $!md5 {
+            note "****   $.filename md5 differs!!\n        Got      { $md5.hex }\n        Expected $!md5";
+        }
 
         unlink $_.pathname for @.file-part-tasks;
     }
