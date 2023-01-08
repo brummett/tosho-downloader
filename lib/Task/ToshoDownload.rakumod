@@ -16,6 +16,23 @@ use Task::MultipartFileJoiner;
 
 method run {
     say "Trying to get $.url";
+    my $client = Cro::HTTP::Client.new();
+    my $url = Cro::Uri.parse($.url);
+    my $response = await $client.get($url);
+    say "Got response from $url, status { $response.status }";
+    if $response.content-type.type-and-subtype eq 'text/html' {
+        self.parse-page($response);
+        self.done;
+    }
+    CATCH {
+        default {
+            $*ERR.say: "\n\n****** Caught exception getting $.url: $_";
+        }
+    }
+}
+
+method XXrun {
+    say "Trying to get $.url";
     my $response = await Cro::HTTP::Client.get($.url);
 
     say "Response for $.url was { $response.status }";
