@@ -1,26 +1,3 @@
-class ToshoFeedFile {
-    has Str $.filename is required;
-    has Str $.md5 is required;
-    has Str @.zippy-share-urls is required;
-}
-
-class ToshoFeedEntry {
-    has Str $.tosho-id is required;
-    has Str $.name is required;
-    has Str $.status is required;  # processing, complete
-    has ToshoFeedFile @.files;
-
-    #method new-from-feed(%item --> ToshoFeedEntry) {
-    #    my @files = %item<files>
-    #    self.new(   tosho-id    => %item<tosho_id>,
-    #                name        => %item<title>,
-    #                status      => %item<status>,
-    #}
-
-    method elems { @!files.elems }
-    #method urls { @!files.map(*.
-}
-
 use Cro::HTTP::Client;
 use Cro::Uri;
 
