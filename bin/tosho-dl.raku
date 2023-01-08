@@ -28,7 +28,7 @@ sub MAIN(
             my $id = %feed{$line};
             say "title $line is id $id";
             if $id {
-                my $task = Task::ToshoDownload.new(queue => $work-queue, id => $id);
+                my $task = Task::ToshoDownload.new(queue => $work-queue, id => $id, name => $line);
                 $work-queue.send($task);
             }
         }

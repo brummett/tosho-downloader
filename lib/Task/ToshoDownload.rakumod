@@ -6,6 +6,7 @@ unit class Task::ToshoDownload is Task;
 # and queue download tasks for each part of each file
 
 has Int $.id;
+has Str $.name;
 
 use Cro::HTTP::Client;
 use Cro::Uri;
@@ -42,7 +43,7 @@ method run {
 
         CATCH {
             when X::Cro::HTTP::Client::Timeout {
-                $*ERR.say: "***** Timeout when getting id { $.id }: $_";
+                $*ERR.say: "***** Timeout when getting $.name id $.id: $_";
                 $num-retries--;
                 redo;
             }
@@ -89,7 +90,6 @@ multi method queue-download-one-of-the-files(Str :$filename, Str :$zippy-share-l
 
 multi method queue-download-one-of-the-files(Str :$filename, :@zippy-share-links, Str :$md5, Str :$title?) {
     say "\t$filename: { @zippy-share-links.elems } parts";
-    say @zippy-share-links.^name, ": ", @zippy-share-links.raku;
 
     my $part-num = 1;
 
@@ -109,4 +109,4 @@ multi method queue-download-one-of-the-files(Str :$filename, :@zippy-share-links
                                                queue => self.queue));
 }
 
-method gist { "Task::ToshoDownload($.id)" }
+method gist { "Task::ToshoDownload(name => $.name, id => $.id)" }
