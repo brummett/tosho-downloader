@@ -81,6 +81,7 @@ class Task::FileDownloader::ZippyShare is Task::FileDownloader {
     method do-download-file($client, $dl-uri) {
         say "Downloading from $.url =>  file $dl-uri";
         my $response = await $client.get($dl-uri);
+        self.pathname.IO.dirname.IO.mkdir;
         my $fh = open self.pathname, :w, :bin;
 
         react {
