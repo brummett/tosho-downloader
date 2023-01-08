@@ -53,6 +53,5 @@ method run {
 }
 
 method gist {
-    my @names = map { $_.filename }, @.file-part-tasks;
-    "Joiner for " ~ @names.join(', ');
+    "Joiner for $.filename: { @.file-part-tasks.elems } parts";
 }
