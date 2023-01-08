@@ -60,12 +60,18 @@ method parse-page($response) {
     if $dom.find('div#content > table').elems == 2 {
         self.queue-download-single-file($dom);
     } else {
-        self.queue-download-multiple-files($dom);
+        my $title = self.parse_title($dom);
+        say "Multi-file title: $title";
+        self.queue-download-multiple-files($title, $dom);
     }
 }
 
+method parse_title($dom) {
+    $dom.find('h2#title')[0].text;
+}
+
 # This page is for downloading a single-file, perhaps split into parts
-method queue-download-single-file($dom) {
+method queue-download-single-file(DOM::Tiny $dom) {
     # For a page describing a single file, the download links are in the second table
     my $download-table = $dom.find('div#content > table')[1];
     my $filename-link = $download-table.find('tr:first-of-type td a')[0];
@@ -77,7 +83,7 @@ method queue-download-single-file($dom) {
 
 # This page is for downloading multiple files grouped together. Each file
 # might be split into parts
-method queue-download-multiple-files($dom) {
+method queue-download-multiple-files(Str $title, DOM::Tiny $dom) {
     my @file-divs = $dom.find('div.view_list_entry');
     say "There are { @file-divs.elems } files on this page";
 
@@ -85,22 +91,26 @@ method queue-download-multiple-files($dom) {
         my $filename-link = $file-div.find('a[href*="animetosho.org"]')[0];
         my @zippy-share-links = $file-div.find('a[href*="zippyshare.com"]');
 
-        self.queue-download-one-of-the-files($filename-link, @zippy-share-links);
+        self.queue-download-one-of-the-files($filename-link, @zippy-share-links, $title);
     }
 }
 
-method queue-download-one-of-the-files($filename-link, @zippy-share-links) {
+method queue-download-one-of-the-files($filename-link, @zippy-share-links, Str $title?) {
     say "\t{ $filename-link.text }: { @zippy-share-links.elems } parts";
 
     my $part-num = 1;
+
+    # Multi-file torrents get binned by the title of the whole group
+    my $filename = $title ?? IO::Spec::Unix.catpath($, $title, $filename-link.text) !! $filename-link.text;
+
     my @child-tasks = map { Task::FileDownloader::ZippyShare.new(
-                                filename => sprintf('%s.%03d', $filename-link.text, $part-num++),
+                                filename => sprintf('%s.%03d', $filename, $part-num++),
                                 url => $_.attr('href'),
                                 queue => self.queue)
                           }, @zippy-share-links;
 
     $.queue.send($_) for @child-tasks;
-    $.queue.send(Task::MultipartFileJoiner.new(filename => $filename-link.text,
+    $.queue.send(Task::MultipartFileJoiner.new(filename => $filename,
                                                file-part-tasks => @child-tasks,
                                                queue => self.queue));
 }

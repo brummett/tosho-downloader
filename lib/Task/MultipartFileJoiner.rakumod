@@ -26,6 +26,8 @@ method run {
         }
     }
 
+    $.filename.IO.dirname.IO.mkdir;
+
     if @.file-part-tasks.elems == 1 {
         # just one part, move the file
         say "  was just one part.  Moving to $.filename";
