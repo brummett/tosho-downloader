@@ -9,8 +9,6 @@ has Int $.id;
 has Str $.name;
 
 use Cro::HTTP::Client;
-use Cro::Uri;
-use DOM::Tiny;
 
 use Task::FileDownloader;
 use Task::MultipartFileJoiner;
