@@ -21,9 +21,7 @@ class Task::FileDownloader::ZippyShare is Task::FileDownloader {
             my $url = Cro::Uri.parse($.url);
             whenever $client.get($url) -> $response {
                 if $response.content-type.type-and-subtype eq 'text/html' {
-                    my $relative-download-path = self.get-download-link($response);
-                    say "Download link in $.url is $relative-download-path";
-                    my $dl-uri = $url.add($relative-download-path);
+                    my $dl-uri = self.get-download-link($response);
                     self.do-download-file($client, $dl-uri);
                 }
                 QUIT {
@@ -70,7 +68,9 @@ class Task::FileDownloader::ZippyShare is Task::FileDownloader {
                                 ~ ( (~$<d1>.Int % ~$<d2>.Int) + (~$<d3>.Int % ~$<d4>.Int ) )
                                 ~ ~$<remainURL>;
 
-           return $download-path;
+            say "Download link in $original-uri is $download-path";
+            my $dl-uri = $original-uri.add($download-path);
+            return $dl-uri;
         } else {
             die "Didn't find download link on $original-uri"
         }
