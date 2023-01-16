@@ -8,12 +8,8 @@ class Task::FileDownloader is Task {
     has Str $.filename;
     has Str $.url;
 
-    method run { ... }
+    method get-download-link(Cro::HTTP::Response $response) { ... }
 
-    method pathname { 'working/' ~ $.filename }
-}
-
-class Task::FileDownloader::ZippyShare is Task::FileDownloader {
     method run {
         say "Trying to download file from $.url";
         react {
@@ -40,7 +36,29 @@ class Task::FileDownloader::ZippyShare is Task::FileDownloader {
         self.done;
     }
 
-    method get-download-link($response) {
+    method do-download-file($client, $dl-uri) {
+        say "Downloading from $.url =>  file $dl-uri";
+        my $response = await $client.get($dl-uri);
+        self.pathname.IO.dirname.IO.mkdir;
+        my $fh = open self.pathname, :w, :bin;
+
+        react {
+            whenever $response.body-byte-stream -> $chunk {
+                $fh.write($chunk);
+            }
+        }
+
+        say "Done downloading $dl-uri";
+        $fh.close;
+    }
+
+    method pathname { 'working/' ~ $.filename }
+
+    method gist { "download-from($.url)" }
+}
+
+class Task::FileDownloader::ZippyShare is Task::FileDownloader {
+    method get-download-link(Cro::HTTP::Response $response) {
         my $dom = DOM::Tiny.parse(await $response.body);
 
         my $original-uri = $response.request.uri;
@@ -75,22 +93,4 @@ class Task::FileDownloader::ZippyShare is Task::FileDownloader {
             die "Didn't find download link on $original-uri"
         }
     }
-
-    method do-download-file($client, $dl-uri) {
-        say "Downloading from $.url =>  file $dl-uri";
-        my $response = await $client.get($dl-uri);
-        self.pathname.IO.dirname.IO.mkdir;
-        my $fh = open self.pathname, :w, :bin;
-
-        react {
-            whenever $response.body-byte-stream -> $chunk {
-                $fh.write($chunk);
-            }
-        }
-
-        say "Done downloading $dl-uri";
-        $fh.close;
-    }
-
-    method gist { "download-from($.url)" }
 }
