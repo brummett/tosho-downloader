@@ -10,7 +10,7 @@ has Str $.name;
 
 use Cro::HTTP::Client;
 
-use Task::FileDownloader;
+use Task::ZippyDownloader;
 use Task::MultipartFileJoiner;
 
 my $client = Cro::HTTP::Client.new(base-uri => 'https://feed.animetosho.org/json',
@@ -97,7 +97,7 @@ multi method queue-download-one-of-the-files(Str :$filename, :@zippy-share-links
     # Multi-file torrents get binned by the title of the whole group
     my $final-filename = $title ?? IO::Spec::Unix.catpath($, $title, $filename) !! $filename;
 
-    my @child-tasks = map { Task::FileDownloader::ZippyShare.new(
+    my @child-tasks = map { Task::ZippyDownloader.new(
                                 filename => sprintf('%s.%03d', $final-filename, $part-num++),
                                 url => $_,
                                 queue => self.queue)
