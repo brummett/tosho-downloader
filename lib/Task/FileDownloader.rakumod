@@ -21,7 +21,7 @@ class Task::FileDownloader::ZippyShare is Task::FileDownloader {
             my $url = Cro::Uri.parse($.url);
             whenever $client.get($url) -> $response {
                 if $response.content-type.type-and-subtype eq 'text/html' {
-                    my $relative-download-path = self.get-download-link($response, $url);
+                    my $relative-download-path = self.get-download-link($response);
                     say "Download link in $.url is $relative-download-path";
                     my $dl-uri = $url.add($relative-download-path);
                     self.do-download-file($client, $dl-uri);
@@ -42,8 +42,10 @@ class Task::FileDownloader::ZippyShare is Task::FileDownloader {
         self.done;
     }
 
-    method get-download-link($response, $url) {
+    method get-download-link($response) {
         my $dom = DOM::Tiny.parse(await $response.body);
+
+        my $original-uri = $response.request.uri;
 
         # ZippyShare has a little bit of javascript that calculates the right
         # URL for the "DOWNLOAD NOW" link or obfuscate it.  It's in a <script>
@@ -70,7 +72,7 @@ class Task::FileDownloader::ZippyShare is Task::FileDownloader {
 
            return $download-path;
         } else {
-            die "Didn't find download link on $url"
+            die "Didn't find download link on $original-uri"
         }
     }
 
