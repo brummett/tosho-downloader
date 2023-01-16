@@ -14,6 +14,7 @@ use Task::FileDownloader;
 use Task::MultipartFileJoiner;
 
 my $client = Cro::HTTP::Client.new(base-uri => 'https://feed.animetosho.org/json',
+                                   :http<1.1>,
                                    timeout => { connection => 10, headers => 10 });
 
 method run {

@@ -4,6 +4,7 @@ use Cro::Uri;
 class X::Tosho::NotFound is Exception { has Str $.name }
 
 my $web-client = Cro::HTTP::Client.new(base-uri => 'https://feed.animetosho.org/json',
+                                       :http<1.1>,
                                        timeout => { connection => 10, headers => 10 });
 
 # Look up a tosho torrent id given a title
