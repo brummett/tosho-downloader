@@ -1,16 +1,62 @@
+use FileDownloader;
 use Task;
 
 class Task::ToshoDownload is Task {
 
+    class X::FileDownloadSources::NoSupportedSources is Exception {
+        has Str $.name;
+        method message { "$!name has no supported sources" }
+    }
+
+    # This class represents one file to be download with one or more sources,
+    # and each source has one or more parts.
+    # It has a mechanism for picking which source to download from.
+    class FileDownloadSources {
+        use Task::ZippyDownloader;
+
+        # The name for this file
+        has Str $.filename is required;
+
+        # pathname on the local system to download to, same as filename unless it's part of a batch
+        has Str $.download-pathname is required;
+
+        # keys are download site names, values are a list of URLs. Comes from the 'links' key of one of the files
+        has %.alternatives is required;
+
+        submethod BUILD(:$!filename, :$!download-pathname, :%!alternatives) {
+            unless %!alternatives<ZippyShare>:exists {
+                die X::FileDownloadSources::NoSupportedSources.new(name => $!filename);
+            }
+        }
+
+        # Pick one of the sources and return a list of downloader Tasks from the
+        # supported sources
+        method get-download-tasks {
+            say "Picking source for $.filename...";
+
+            # when there's only one link, it's a plain string rather than a list of one item
+            my @zippy-links = %!alternatives<ZippyShare> ~~ Str ?? [  %!alternatives<ZippyShare> ] !! %!alternatives<ZippyShare>.List;
+            say "    There are { @zippy-links.elems } Zippy links";
+
+            my $part-num = 1;
+            my @dl-tasks = @zippy-links.map({
+                                Task::ZippyDownloader.new(
+                                    filename => sprintf('%s.%03d', $!download-pathname, $part-num++),
+                                    url => $_)
+                            });
+            say "    There are { @dl-tasks.elems } download tasks";
+            return @dl-tasks;
+        }
+    }
+
     # Download torrent ID from animetosho's feed API
     # and queue download tasks for each part of each file
 
-    has Int $.id;
-    has Str $.name;
+    has Int $.id is required;
+    has Str $.name is required;
 
     use Cro::HTTP::Client;
 
-    use Task::ZippyDownloader;
     use Task::MultipartFileJoiner;
 
     my $client = Cro::HTTP::Client.new(base-uri => 'https://feed.animetosho.org/json',
@@ -59,13 +105,17 @@ class Task::ToshoDownload is Task {
 
     # This page is for downloading a single-file, perhaps split into parts
     method queue-download-single-file($file) {
-        if $file<links><ZippyShare> and $file<links><ZippyShare>.elems < 1 {
-            note "**** $file<filename> has no ZippyShare links";
-
-        } else {
-            self.queue-download-one-of-the-files(filename => $file<filename>,
-                                                 md5 => $file<md5>,
-                                                 zippy-share-links => $file<links><ZippyShare>);
+        my $dl-sources = FileDownloadSources.new(filename          => $file<filename>,
+                                                 download-pathname => $file<filename>,
+                                                 alternatives      => $file<links>,
+                                                );
+        self.queue-download-one-of-the-files(filename   => $file<filename>,
+                                             md5        => $file<md5>,
+                                             dl-sources => $dl-sources);
+        CATCH {
+            when X::FileDownloadSources::NoSupportedSources {
+                $*ERR.say: "***** ",$_;
+            }
         }
     }
 
@@ -73,39 +123,30 @@ class Task::ToshoDownload is Task {
     # might be split into parts
     method queue-download-multiple-files(Str $title, @files) {
         for @files -> $file {
-            if $file<links><ZippyShare> and $file<links><ZippyShare>.elems < 1 {
-                note "**** $file<filename> has no ZippyShare links";
+            my $final-filename = IO::Spec::Unix.catpath($, $title, $file<filename>);
+            my $dl-sources = FileDownloadSources.new(filename           => $file<filename>,
+                                                     download-pathname  => $final-filename,
+                                                     alternatives        => $file<links>,
+                                                    );
+            self.queue-download-one-of-the-files(filename   => $final-filename,
+                                                 md5        => $file<md5>,
+                                                 dl-sources => $dl-sources);
 
-            } else {
-                self.queue-download-one-of-the-files(filename => $file<filename>,
-                                                     md5 => $file<md5>,
-                                                     zippy-share-links => $file<links><ZippyShare>,
-                                                     title => $title);
+            CATCH {
+                when X::FileDownloadSources::NoSupportedSources {
+                    $*ERR.say: "***** ",$_;
+                }
             }
         }
     }
 
-    multi method queue-download-one-of-the-files(Str :$filename, Str :$zippy-share-links, Str :$md5, Str :$title?) {
-        self.queue-download-one-of-the-files(:$filename, zippy-share-links => [ $zippy-share-links ], :$md5, :$title)
-    }
+    method queue-download-one-of-the-files(Str :$filename, Str :$md5, FileDownloadSources :$dl-sources) {
+        my @dl-tasks is Array[FileDownloader] = $dl-sources.get-download-tasks();
+        say "\t$filename: { @dl-tasks.elems } parts";
 
-    multi method queue-download-one-of-the-files(Str :$filename, :@zippy-share-links, Str :$md5, Str :$title?) {
-        say "\t$filename: { @zippy-share-links.elems } parts";
-
-        my $part-num = 1;
-
-        # Multi-file torrents get binned by the title of the whole group
-        my $final-filename = $title ?? IO::Spec::Unix.catpath($, $title, $filename) !! $filename;
-
-        my @child-tasks = map { Task::ZippyDownloader.new(
-                                    filename => sprintf('%s.%03d', $final-filename, $part-num++),
-                                    url => $_,
-                                    queue => self.queue)
-                              }, @zippy-share-links;
-
-        $.queue.send($_) for @child-tasks;
-        $.queue.send(Task::MultipartFileJoiner.new(filename => $final-filename,
-                                                   file-part-tasks => @child-tasks,
+        $.queue.send($_) for @dl-tasks;
+        $.queue.send(Task::MultipartFileJoiner.new(filename => $filename,
+                                                   file-part-tasks => @dl-tasks,
                                                    md5 => $md5,
                                                    queue => self.queue));
     }
