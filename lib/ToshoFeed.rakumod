@@ -32,7 +32,7 @@ class TitleToToshoId does Associative[Str, Int] {
         if not %!index{$name}:exists {
             say "    Refreshing feed page 1...";
             self.get-feed-page(1);
-            while (not %!index{$name}:exists) and ($page-tries-- > 0) {
+            until (%!index{$name}:exists) or ($page-tries-- <= 0) {
                 say "    Refreshing feed page $page...";
                 self.get-feed-page($page++);
             }
@@ -58,9 +58,9 @@ class TitleToToshoId does Associative[Str, Int] {
             my $data = await $response.body();
 
             for @$data -> $item {
-                say "  $item<title> => $item<id>";
                 %!index{$item<title>} = $item<id>;
             }
+            say "    { $data.elems } items";
 
             $!last-page-retrieved = $page if $page > $!last-page-retrieved;
 
