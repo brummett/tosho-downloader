@@ -8,7 +8,7 @@ my $web-client = Cro::HTTP::Client.new(base-uri => 'https://feed.animetosho.org/
                                        timeout => { connection => 10, headers => 10 });
 
 # Look up a tosho torrent id given a title
-class TitleToToshoId does Associative {
+class TitleToToshoId does Associative[Str, Int] {
     my $max-page-tries = 10;
 
     has Int %!index;
