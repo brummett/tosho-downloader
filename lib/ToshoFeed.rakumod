@@ -39,8 +39,8 @@ class TitleToToshoId does Associative[Str, Int] {
         }
         say "    Done refreshing feed";
 
-        X::Tosho::NotFound.new(:$name).throw if not %!index{$name}:exists;
-            
+        die X::Tosho::NotFound.new(:$name) unless %!index{$name}:exists;
+
         %!index{$name};
     }
 

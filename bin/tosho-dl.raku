@@ -24,6 +24,12 @@ sub MAIN(
 
     react {
         whenever $*IN.lines.Supply -> $line {
+            CATCH {
+                when X::Tosho::NotFound {
+                    note "*** Didn't find { .name } in the index";
+                }
+            }
+
             say "read line: $line";
             my $id = %feed{$line};
             say "title $line is id $id";
