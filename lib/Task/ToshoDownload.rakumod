@@ -58,27 +58,29 @@ method run {
 
 # This page is for downloading a single-file, perhaps split into parts
 method queue-download-single-file($file) {
-    if $file<links><ZippyShare>.elems < 1 {
-        die "**** $file<filename> has no ZippyShare links";
-    }
+    if $file<links><ZippyShare> and $file<links><ZippyShare>.elems < 1 {
+        note "**** $file<filename> has no ZippyShare links";
 
-    self.queue-download-one-of-the-files(filename => $file<filename>,
-                                         md5 => $file<md5>,
-                                         zippy-share-links => $file<links><ZippyShare>);
+    } else {
+        self.queue-download-one-of-the-files(filename => $file<filename>,
+                                             md5 => $file<md5>,
+                                             zippy-share-links => $file<links><ZippyShare>);
+    }
 }
 
 # This page is for downloading multiple files grouped together. Each file
 # might be split into parts
 method queue-download-multiple-files(Str $title, @files) {
     for @files -> $file {
-        if $file<links><ZippyShare>.elems < 1 {
-            die "**** $file<filename> has no ZippyShare links";
-        }
+        if $file<links><ZippyShare> and $file<links><ZippyShare>.elems < 1 {
+            note "**** $file<filename> has no ZippyShare links";
 
-        self.queue-download-one-of-the-files(filename => $file<filename>,
-                                             md5 => $file<md5>,
-                                             zippy-share-links => $file<links><ZippyShare>,
-                                             title => $title);
+        } else {
+            self.queue-download-one-of-the-files(filename => $file<filename>,
+                                                 md5 => $file<md5>,
+                                                 zippy-share-links => $file<links><ZippyShare>,
+                                                 title => $title);
+        }
     }
 }
 
