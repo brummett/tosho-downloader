@@ -10,10 +10,6 @@ class Task::FileDownloader is Task {
 
     method run { ... }
 
-    method init {
-        mkdir self.pathname;
-    }
-
     method pathname { 'working/' ~ $.filename }
 }
 
@@ -92,26 +88,6 @@ class Task::FileDownloader::ZippyShare is Task::FileDownloader {
 
         say "Done downloading $dl-uri";
         $fh.close;
-    }
-
-    method Xdo-download-file($client, $dl-uri) {
-        say "Downloading from $.url =>  file $dl-uri";
-        my $bytes-read = 0;
-        my $start-time = now;
-        react {
-            whenever $client.get($dl-uri) -> $response {
-                my $fh = open self.pathname, :w, :bin;
-                whenever $response.body-byte-stream -> $chunk {
-                    $bytes-read += $chunk.bytes;
-                    $fh.write($chunk);
-                }
-                LAST {
-                    my $mbps = $bytes-read / 1024 / 1024 / (now - $start-time);
-                    printf("Done downloading $dl-uri: %.1f\n", $mbps);
-                    $fh.close;
-                }
-            }
-        }
     }
 
     method gist { "download-from($.url)" }
