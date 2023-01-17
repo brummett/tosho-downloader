@@ -2,6 +2,10 @@ use Cro::HTTP::Response;
 use Cro::HTTP::Client;
 use Cro::Uri;
 
+# Represents when there are too many concurrent downloads from a source
+# and we should try another
+#class X::FileDownloader::SourceBandwidthExceeded { }
+
 constant $user-agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:108.0) Gecko/20100101 Firefox/108.0';
 
 role FileDownloader {

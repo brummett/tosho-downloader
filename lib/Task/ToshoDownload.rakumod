@@ -57,6 +57,8 @@ class Task::ToshoDownload is Task {
         # Returns a key in the %alternatives hash for which source to download from,
         # which must be a key in %download-classes
         method !pick-download-source( --> Str) {
+            #return 'ZippyShare';
+
             # Pick Kraken if there's only one file to download
             if %!alternatives<KrakenFiles>:exists and %!alternatives<KrakenFiles> ~~ Str {
                 return 'KrakenFiles';

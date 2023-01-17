@@ -8,6 +8,18 @@ use DOM::Tiny;
 unit class Task::KrakenDownloader does FileDownloader is Task;
 
 constant $wk-boundary = '------WebKitFormBoundary7MA4YWxkTrZu0gW';
+#constant $max-concurrent-downloads = 2;
+
+#my $concurrent-downloads = 0;
+#submethod BUILD {
+#    die X::FileDownloader::SourceBandwidthExceeded.new() if $concurrent-downloads > $max-concurrent-downloads;
+#    $concurrent-downloads++;
+#}
+#
+#method done {
+#    $concurrent-downloads--;
+#    callsame;
+#}
 
 method get-download-link(Cro::HTTP::Response $response --> Cro::Uri) {
     my $original-uri = $response.request.uri;
