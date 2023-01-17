@@ -45,17 +45,36 @@ role FileDownloader {
 
     method do-download-file($dl-uri) {
         say "Downloading from $.url =>  file $dl-uri";
+        my $start-time = now;
+
         my $response = await $.client.get($dl-uri, user-agent => $user-agent);
         self.pathname.IO.dirname.IO.mkdir;
         my $fh = open self.pathname, :w, :bin;
 
+        my $progress-timer = Supply.interval(30, delay => 10);
+        my $bytes = 0;
         react {
             whenever $response.body-byte-stream -> $chunk {
+                #say "read { $chunk.elems } bytes";
+                $bytes += $chunk.elems;
                 $fh.write($chunk);
+                LAST {
+                    $fh.close;
+                    done;
+                }
+            }
+            whenever $progress-timer {
+                self.say-progress(message => 'In progress:', bytes => $bytes, start-time => $start-time);
             }
         }
 
-        say "Done downloading $dl-uri";
-        $fh.close;
+        self.say-progress(message => 'Done Downloading', bytes => $bytes, start-time => $start-time);
+    }
+
+    method say-progress(:$message, :$start-time, :$bytes) {
+        my $KB = $bytes / 1024;
+        my $MB = $KB / 1024;
+        my $k-per-sec = $KB / ( now - $start-time).Int;
+        printf("%s $.filename %0.2f MB %0.2f KB/s\n", $message, $MB, $k-per-sec);
     }
 }
