@@ -172,11 +172,20 @@ class Task::ToshoDownload is Task {
         my @dl-tasks is Array[FileDownloader] = $dl-sources.get-download-tasks();
         say "\t$filename: { @dl-tasks.elems } parts";
 
-        $.queue.send($_) for @dl-tasks;
-        $.queue.send(Task::MultipartFileJoiner.new(filename => $filename,
-                                                   file-part-tasks => @dl-tasks,
-                                                   md5 => $md5,
-                                                   queue => self.queue));
+        my @promises;
+        for @dl-tasks -> $dl-task {
+            @promises.push($dl-task.is-done);
+            $.queue.send($dl-task);
+        }
+
+        start {
+            await @promises;
+            say "All parts of $filename are finished, queueing joiner task";
+            $.queue.send(Task::MultipartFileJoiner.new(filename => $filename,
+                                                       file-part-tasks => @dl-tasks,
+                                                       md5 => $md5,
+                                                       queue => self.queue));
+        }
     }
 
     method gist { "Task::ToshoDownload(name => $.name, id => $.id)" }

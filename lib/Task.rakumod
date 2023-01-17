@@ -1,8 +1,8 @@
 unit class Task;
 
 has Channel $.queue;
-has $.is-done is rw = False;
+has Promise $.is-done = .new;
 
 method run { ... }
 
-method done { $.is-done = True }
+method done { $.is-done.keep(True) }
