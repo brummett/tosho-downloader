@@ -13,6 +13,7 @@ class Task::ToshoDownload is Task {
     # It has a mechanism for picking which source to download from.
     class FileDownloadSources {
         use Task::ZippyDownloader;
+        use Task::KrakenDownloader;
 
         # The name for this file
         has Str $.filename is required;
@@ -23,8 +24,11 @@ class Task::ToshoDownload is Task {
         # keys are download site names, values are a list of URLs. Comes from the 'links' key of one of the files
         has %.alternatives is required;
 
+        my %download-classes = ZippyShare => Task::ZippyDownloader,
+                               KrakenFiles => Task::KrakenDownloader;
+
         submethod BUILD(:$!filename, :$!download-pathname, :%!alternatives) {
-            unless %!alternatives<ZippyShare>:exists {
+            unless any(%!alternatives{ %download-classes.keys }:exists) {
                 die X::FileDownloadSources::NoSupportedSources.new(name => $!filename);
             }
         }
@@ -34,18 +38,40 @@ class Task::ToshoDownload is Task {
         method get-download-tasks {
             say "Picking source for $.filename...";
 
+            my $source = self!pick-download-source;
+
             # when there's only one link, it's a plain string rather than a list of one item
-            my @zippy-links = %!alternatives<ZippyShare> ~~ Str ?? [  %!alternatives<ZippyShare> ] !! %!alternatives<ZippyShare>.List;
-            say "    There are { @zippy-links.elems } Zippy links";
+            my @dl-links = %!alternatives{$source} ~~ Str ?? [  %!alternatives{$source} ] !! %!alternatives{$source}.List;
+            say "    There are { @dl-links.elems } $source links";
 
             my $part-num = 1;
-            my @dl-tasks = @zippy-links.map({
-                                Task::ZippyDownloader.new(
+            my @dl-tasks = @dl-links.map({
+                                %download-classes{$source}.new(
                                     filename => sprintf('%s.%03d', $!download-pathname, $part-num++),
                                     url => $_)
                             });
             say "    There are { @dl-tasks.elems } download tasks";
             return @dl-tasks;
+        }
+
+        # Returns a key in the %alternatives hash for which source to download from,
+        # which must be a key in %download-classes
+        method !pick-download-source( --> Str) {
+            # Pick Kraken if there's only one file to download
+            if %!alternatives<KrakenFiles>:exists and %!alternatives<KrakenFiles> ~~ Str {
+                return 'KrakenFiles';
+
+            # Pick Zippy if it's a choice
+            } elsif %!alternatives<ZippyShare>:exists {
+                return 'ZippyShare'
+
+            # Pick Kraken here if there are multiple parts, but Zippy wasn't a choice
+            } elsif %!alternatives<KrakenFiles>:exists {
+                return 'KrakenFiles';
+
+            } else {
+                die "Couldn't pick a download source for $!filename";
+            }
         }
     }
 
