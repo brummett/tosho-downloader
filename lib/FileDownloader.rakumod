@@ -10,9 +10,9 @@ constant $user-agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:108.0) 
 
 role FileDownloader {
 
-    has Str $.filename;
-    has Str $.url;
-    has Cro::HTTP::Client $.client = .new;
+    has Str $.filename is required;
+    has Str $.url is required;
+    has Cro::HTTP::Client $.client = .new(:http<1.1>);  # KrakenFiles has bad thruput with http/2
 
     method pathname { 'working/' ~ $.filename }
     method gist { "download-from($.url)" }
