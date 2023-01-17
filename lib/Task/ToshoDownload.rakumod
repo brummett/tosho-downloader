@@ -1,113 +1,183 @@
+use FileDownloader;
 use Task;
 
-unit class Task::ToshoDownload is Task;
+class Task::ToshoDownload is Task {
 
-# Download torrent ID from animetosho's feed API
-# and queue download tasks for each part of each file
+    class X::FileDownloadSources::NoSupportedSources is Exception {
+        has Str $.name;
+        method message { "$!name has no supported sources" }
+    }
 
-has Int $.id;
-has Str $.name;
+    # This class represents one file to be download with one or more sources,
+    # and each source has one or more parts.
+    # It has a mechanism for picking which source to download from.
+    class FileDownloadSources {
+        use Task::ZippyDownloader;
+        use Task::KrakenDownloader;
 
-use Cro::HTTP::Client;
+        # The name for this file
+        has Str $.filename is required;
 
-use Task::FileDownloader;
-use Task::MultipartFileJoiner;
+        # pathname on the local system to download to, same as filename unless it's part of a batch
+        has Str $.download-pathname is required;
 
-my $client = Cro::HTTP::Client.new(base-uri => 'https://feed.animetosho.org/json',
-                                   :http<1.1>,
-                                   timeout => { connection => 10, headers => 10 });
+        # keys are download site names, values are a list of URLs. Comes from the 'links' key of one of the files
+        has %.alternatives is required;
 
-method run {
-    say "Trying to get tosho id $.id from feed API";
+        my %download-classes = ZippyShare => Task::ZippyDownloader,
+                               KrakenFiles => Task::KrakenDownloader;
 
-    my $num-retries = 5;
+        submethod BUILD(:$!filename, :$!download-pathname, :%!alternatives) {
+            unless any(%!alternatives{ %download-classes.keys }:exists) {
+                die X::FileDownloadSources::NoSupportedSources.new(name => $!filename);
+            }
+        }
 
-    while $num-retries > 0 {
-        my $response = await $client.get('', query => { show => 'torrent', id => $.id });
-        say "Got response for $.id, status { $response.status }";
-        my $data = await $response.body();
+        # Pick one of the sources and return a list of downloader Tasks from the
+        # supported sources
+        method get-download-tasks {
+            say "Picking source for $.filename...";
 
-        # status can be "complete", "skipped", "processing"
-        if $data<status> ne 'complete' {
-            say "$data<title> is not yet complete: $data<status>";
+            my $source = self!pick-download-source;
+
+            # when there's only one link, it's a plain string rather than a list of one item
+            my @dl-links = %!alternatives{$source} ~~ Str ?? [  %!alternatives{$source} ] !! %!alternatives{$source}.List;
+            say "    There are { @dl-links.elems } $source links";
+
+            my $part-num = 1;
+            my @dl-tasks = @dl-links.map({
+                                %download-classes{$source}.new(
+                                    filename => sprintf('%s.%03d', $!download-pathname, $part-num++),
+                                    url => $_)
+                            });
+            say "    There are { @dl-tasks.elems } download tasks";
+            return @dl-tasks;
+        }
+
+        # Returns a key in the %alternatives hash for which source to download from,
+        # which must be a key in %download-classes
+        method !pick-download-source( --> Str) {
+            #return 'ZippyShare';
+
+            # Pick Kraken if there's only one file to download
+            if %!alternatives<KrakenFiles>:exists and %!alternatives<KrakenFiles> ~~ Str {
+                return 'KrakenFiles';
+
+            # Pick Zippy if it's a choice
+            } elsif %!alternatives<ZippyShare>:exists {
+                return 'ZippyShare'
+
+            # Pick Kraken here if there are multiple parts, but Zippy wasn't a choice
+            } elsif %!alternatives<KrakenFiles>:exists {
+                return 'KrakenFiles';
+
+            } else {
+                die "Couldn't pick a download source for $!filename";
+            }
+        }
+    }
+
+    # Download torrent ID from animetosho's feed API
+    # and queue download tasks for each part of each file
+
+    has Int $.id is required;
+    has Str $.name is required;
+
+    use Cro::HTTP::Client;
+
+    use Task::MultipartFileJoiner;
+
+    my $client = Cro::HTTP::Client.new(base-uri => 'https://feed.animetosho.org/json',
+                                       :http<1.1>,
+                                       timeout => { connection => 10, headers => 10 });
+
+    method run {
+        say "Trying to get tosho id $.id from feed API";
+
+        my $num-retries = 5;
+
+        while $num-retries > 0 {
+            my $response = await $client.get('', query => { show => 'torrent', id => $.id });
+            say "Got response for $.id, status { $response.status }";
+            my $data = await $response.body();
+
+            # status can be "complete", "skipped", "processing"
+            if $data<status> ne 'complete' {
+                say "$data<title> is not yet complete: $data<status>";
+                self.done;
+                return;
+            }
+
+            if $data<num_files> == 1 {
+                self.queue-download-single-file($data<files>[0]);
+            } else {
+                self.queue-download-multiple-files($data<title>, $data<files>);
+            }
+
+            CATCH {
+                when X::Cro::HTTP::Client::Timeout {
+                    $*ERR.say: "***** Timeout when getting $.name id $.id: $_";
+                    $num-retries--;
+                    redo;
+                }
+                default {
+                    $*ERR.say: "\n\n****** Caught exception { $_.^name } getting $.id: ",$_;
+                    last;
+                }
+            }
+
             self.done;
             return;
         }
+    }
 
-        if $data<num_files> == 1 {
-            self.queue-download-single-file($data<files>[0]);
-        } else {
-            self.queue-download-multiple-files($data<title>, $data<files>);
-        }
-
+    # This page is for downloading a single-file, perhaps split into parts
+    method queue-download-single-file($file) {
+        my $dl-sources = FileDownloadSources.new(filename          => $file<filename>,
+                                                 download-pathname => $file<filename>,
+                                                 alternatives      => $file<links>,
+                                                );
+        self.queue-download-one-of-the-files(filename   => $file<filename>,
+                                             md5        => $file<md5>,
+                                             dl-sources => $dl-sources);
         CATCH {
-            when X::Cro::HTTP::Client::Timeout {
-                $*ERR.say: "***** Timeout when getting $.name id $.id: $_";
-                $num-retries--;
-                redo;
-            }
-            default {
-                $*ERR.say: "\n\n****** Caught exception { $_.^name } getting $.id: ",$_;
-                last;
+            when X::FileDownloadSources::NoSupportedSources {
+                $*ERR.say: "***** ",$_;
             }
         }
-
-        self.done;
-        return;
     }
-}
 
-# This page is for downloading a single-file, perhaps split into parts
-method queue-download-single-file($file) {
-    if $file<links><ZippyShare> and $file<links><ZippyShare>.elems < 1 {
-        note "**** $file<filename> has no ZippyShare links";
+    # This page is for downloading multiple files grouped together. Each file
+    # might be split into parts
+    method queue-download-multiple-files(Str $title, @files) {
+        for @files -> $file {
+            my $final-filename = IO::Spec::Unix.catpath($, $title, $file<filename>);
+            my $dl-sources = FileDownloadSources.new(filename           => $file<filename>,
+                                                     download-pathname  => $final-filename,
+                                                     alternatives        => $file<links>,
+                                                    );
+            self.queue-download-one-of-the-files(filename   => $final-filename,
+                                                 md5        => $file<md5>,
+                                                 dl-sources => $dl-sources);
 
-    } else {
-        self.queue-download-one-of-the-files(filename => $file<filename>,
-                                             md5 => $file<md5>,
-                                             zippy-share-links => $file<links><ZippyShare>);
-    }
-}
-
-# This page is for downloading multiple files grouped together. Each file
-# might be split into parts
-method queue-download-multiple-files(Str $title, @files) {
-    for @files -> $file {
-        if $file<links><ZippyShare> and $file<links><ZippyShare>.elems < 1 {
-            note "**** $file<filename> has no ZippyShare links";
-
-        } else {
-            self.queue-download-one-of-the-files(filename => $file<filename>,
-                                                 md5 => $file<md5>,
-                                                 zippy-share-links => $file<links><ZippyShare>,
-                                                 title => $title);
+            CATCH {
+                when X::FileDownloadSources::NoSupportedSources {
+                    $*ERR.say: "***** ",$_;
+                }
+            }
         }
     }
+
+    method queue-download-one-of-the-files(Str :$filename, Str :$md5, FileDownloadSources :$dl-sources) {
+        my @dl-tasks is Array[FileDownloader] = $dl-sources.get-download-tasks();
+        say "\t$filename: { @dl-tasks.elems } parts";
+
+        $.queue.send($_) for @dl-tasks;
+        $.queue.send(Task::MultipartFileJoiner.new(filename => $filename,
+                                                   file-part-tasks => @dl-tasks,
+                                                   md5 => $md5,
+                                                   queue => self.queue));
+    }
+
+    method gist { "Task::ToshoDownload(name => $.name, id => $.id)" }
 }
-
-multi method queue-download-one-of-the-files(Str :$filename, Str :$zippy-share-links, Str :$md5, Str :$title?) {
-    self.queue-download-one-of-the-files(:$filename, zippy-share-links => [ $zippy-share-links ], :$md5, :$title)
-}
-
-multi method queue-download-one-of-the-files(Str :$filename, :@zippy-share-links, Str :$md5, Str :$title?) {
-    say "\t$filename: { @zippy-share-links.elems } parts";
-
-    my $part-num = 1;
-
-    # Multi-file torrents get binned by the title of the whole group
-    my $final-filename = $title ?? IO::Spec::Unix.catpath($, $title, $filename) !! $filename;
-
-    my @child-tasks = map { Task::FileDownloader::ZippyShare.new(
-                                filename => sprintf('%s.%03d', $final-filename, $part-num++),
-                                url => $_,
-                                queue => self.queue)
-                          }, @zippy-share-links;
-
-    $.queue.send($_) for @child-tasks;
-    $.queue.send(Task::MultipartFileJoiner.new(filename => $final-filename,
-                                               file-part-tasks => @child-tasks,
-                                               md5 => $md5,
-                                               queue => self.queue));
-}
-
-method gist { "Task::ToshoDownload(name => $.name, id => $.id)" }
