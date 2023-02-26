@@ -12,6 +12,19 @@ method get-download-link(Cro::HTTP::Response $response --> Cro::Uri) {
 
     my $original-uri = $response.request.uri;
 
+    my @parsers = &parser1;
+
+    for @parsers -> $parser {
+        if my $download-path = $parser($dom) {
+            say "Download link in $original-uri is $download-path";
+            my $dl-uri = $original-uri.add($download-path);
+            return $dl-uri;
+        }
+    }
+    die "Didn't find download link on $original-uri"
+}
+
+sub parser1($dom) {
     # ZippyShare has a little bit of javascript that calculates the right
     # URL for the "DOWNLOAD NOW" link or obfuscate it.  It's in a <script>
     # block right after the download link.
@@ -34,11 +47,7 @@ method get-download-link(Cro::HTTP::Response $response --> Cro::Uri) {
         my $download-path = ~$<baseURL>
                             ~ ( (~$<d1>.Int % ~$<d2>.Int) + (~$<d3>.Int % ~$<d4>.Int ) )
                             ~ ~$<remainURL>;
-
-        say "Download link in $original-uri is $download-path";
-        my $dl-uri = $original-uri.add($download-path);
-        return $dl-uri;
-    } else {
-        die "Didn't find download link on $original-uri"
+        return $download-path;
     }
+    return;
 }
