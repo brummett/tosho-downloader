@@ -12,7 +12,7 @@ method get-download-link(Cro::HTTP::Response $response --> Cro::Uri) {
 
     my $original-uri = $response.request.uri;
 
-    my @parsers = &parser1;
+    my @parsers = &parser2, &parser1;
 
     for @parsers -> $parser {
         if my $download-path = $parser($dom) {
@@ -48,6 +48,41 @@ sub parser1($dom) {
                             ~ ( (~$<d1>.Int % ~$<d2>.Int) + (~$<d3>.Int % ~$<d4>.Int ) )
                             ~ ~$<remainURL>;
         return $download-path;
+    }
+    return;
+}
+
+sub parser2($dom) {
+    # There are multiple <script> blocks.  One defines a function named "somffunction".
+    # It does a thing like this:
+    #   document.getElementById('dlbutton').omg = 782518%78956;
+    #   var b = parseInt(document.getElementById('dlbutton').omg) * (782518%3);
+    #   var e = function() {if (false) {return a+b+c} else {return (a+3)%b + 3}};  // irrevelant line
+    #   document.getElementById('dlbutton').href    = "/d/dLS9rSN9/"+(b+18)+"blahblah"
+    #
+    # The calculation for that thing in the middle becomes:
+    #   (( d1 % $d2 ) * ( d3 % d4 )) + d5
+
+    for $dom.find('script') -> $script {
+        if $script ~~ /'var somffunction = function()'/
+            and $script ~~ rx{'document.getElementById(\'dlbutton\').omg = '
+                                $<d1>=\d+
+                                '%'
+                                $<d2>=\d+
+                                ';' \s+ 'var b = parseInt(document.getElementById(\'dlbutton\').omg) * ('
+                                $<d3>=\d+
+                                '%'
+                                $<d4>=\d+
+                                ')' .*? 'document.getElementById(\'dlbutton\').href' \s+ '= "'
+                                $<baseURL>=<-["]>+
+                                '"+(b+' $<d5>=\d+ ')+"'
+                                $<remainURL>=<-["]>+ '"' }
+        {
+            my $download-path = ~$<baseURL>
+                                ~ (( ~$<d1>.Int % ~$<d2>.Int ) * ( ~$<d3>.Int % ~$<d4>.Int)) + ~$<d5>.Int
+                                ~ ~$<remainURL>;
+            return $download-path;
+        }
     }
     return;
 }
