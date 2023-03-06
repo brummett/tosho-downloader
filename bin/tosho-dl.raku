@@ -30,14 +30,18 @@ sub MAIN(
                 }
             }
 
-            say "read line: $line";
-            my $id = %feed{$line};
-            say "title $line is id $id";
-            if $id {
-                my $task = Task::ToshoDownload.new(queue => $work-queue, id => $id, name => $line);
-                $work-queue.send($task);
+            my $trimmed = $line.trim;
+            say "read line: $trimmed";
+
+            if $trimmed.chars > 1 {
+                my $id = %feed{$trimmed};
+                say "title $trimmed is id $id";
+                if $id {
+                    my $task = Task::ToshoDownload.new(queue => $work-queue, id => $id, name => $trimmed);
+                    $work-queue.send($task);
+                }
             }
         }
     }
-    say "main, all done!"
+    say "main, all done!";
 }
