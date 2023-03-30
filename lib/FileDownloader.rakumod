@@ -52,6 +52,7 @@ role FileDownloader {
         my $start-time = now;
 
         my $response = await $.client.get($dl-uri, user-agent => $user-agent, headers => @!dl-headers);
+        my $total-size = $response.header('Content-Length');
         self.pathname.IO.dirname.IO.mkdir;
         my $fh = open self.pathname, :w, :bin;
 
@@ -68,17 +69,18 @@ role FileDownloader {
                 }
             }
             whenever $progress-timer {
-                self.say-progress(message => 'In progress:', bytes => $bytes, start-time => $start-time);
+                self.say-progress(message => 'In progress:', bytes => $bytes, start-time => $start-time, total-size => $total-size);
             }
         }
 
-        self.say-progress(message => 'Done Downloading', bytes => $bytes, start-time => $start-time);
+        self.say-progress(message => 'Done Downloading', bytes => $bytes, start-time => $start-time, total-size => $total-size);
     }
 
-    method say-progress(:$message, :$start-time, :$bytes) {
+    method say-progress(:$message, :$start-time, :$bytes, :$total-size) {
         my $KB = $bytes / 1024;
         my $MB = $KB / 1024;
         my $k-per-sec = $KB / ( now - $start-time).Int;
-        printf("%s $.filename %0.2f MB %0.2f KB/s\n", $message, $MB, $k-per-sec);
+        my $pct = ($bytes / $total-size) * 100;
+        printf("%s $.filename %0.2f MB %0.2f KB/s %0.1f%%\n", $message, $MB, $k-per-sec, $pct);
     }
 }
