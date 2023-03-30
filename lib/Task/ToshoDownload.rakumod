@@ -12,7 +12,6 @@ class Task::ToshoDownload is Task {
     # and each source has one or more parts.
     # It has a mechanism for picking which source to download from.
     class FileDownloadSources {
-        use Task::ZippyDownloader;
         use Task::KrakenDownloader;
         use Task::GofileDownloader;
 
@@ -25,9 +24,8 @@ class Task::ToshoDownload is Task {
         # keys are download site names, values are a list of URLs. Comes from the 'links' key of one of the files
         has %.alternatives is required;
 
-        my %download-classes = ZippyShare => Task::ZippyDownloader,
-                               KrakenFiles => Task::KrakenDownloader,
-                               GoFile => Task::GofileDownloader;;
+        my %download-classes = KrakenFiles => Task::KrakenDownloader,
+                               GoFile => Task::GofileDownloader;
 
         submethod BUILD(:$!filename, :$!download-pathname, :%!alternatives) {
             unless any(%!alternatives{ %download-classes.keys }:exists) {
@@ -66,22 +64,6 @@ class Task::ToshoDownload is Task {
 
             # Otherwise, just pick one
             return <GoFile KrakenFiles>.pick;
-
-            # Pick Kraken if there's only one file to download
-            if %!alternatives<KrakenFiles>:exists and %!alternatives<KrakenFiles> ~~ Str {
-                return 'KrakenFiles';
-
-            # Pick Zippy if it's a choice
-            } elsif %!alternatives<ZippyShare>:exists {
-                return 'ZippyShare'
-
-            # Pick Kraken here if there are multiple parts, but Zippy wasn't a choice
-            } elsif %!alternatives<KrakenFiles>:exists {
-                return 'KrakenFiles';
-
-            } else {
-                die "Couldn't pick a download source for $!filename";
-            }
         }
     }
 

@@ -1,3 +1,5 @@
+# Note that ZippyShare is shut down and Tosho no longer uses them
+
 use FileDownloader;
 use Task;
 
