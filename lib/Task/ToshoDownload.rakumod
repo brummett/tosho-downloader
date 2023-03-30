@@ -14,6 +14,7 @@ class Task::ToshoDownload is Task {
     class FileDownloadSources {
         use Task::ZippyDownloader;
         use Task::KrakenDownloader;
+        use Task::GofileDownloader;
 
         # The name for this file
         has Str $.filename is required;
@@ -25,7 +26,8 @@ class Task::ToshoDownload is Task {
         has %.alternatives is required;
 
         my %download-classes = ZippyShare => Task::ZippyDownloader,
-                               KrakenFiles => Task::KrakenDownloader;
+                               KrakenFiles => Task::KrakenDownloader,
+                               GoFile => Task::GofileDownloader;;
 
         submethod BUILD(:$!filename, :$!download-pathname, :%!alternatives) {
             unless any(%!alternatives{ %download-classes.keys }:exists) {
@@ -57,7 +59,8 @@ class Task::ToshoDownload is Task {
         # Returns a key in the %alternatives hash for which source to download from,
         # which must be a key in %download-classes
         method !pick-download-source( --> Str) {
-            return 'ZippyShare';
+            return 'GoFile';
+            return 'KrakenFiles';
 
             # Pick Kraken if there's only one file to download
             if %!alternatives<KrakenFiles>:exists and %!alternatives<KrakenFiles> ~~ Str {

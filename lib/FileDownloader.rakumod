@@ -13,7 +13,7 @@ role FileDownloader {
     has Str $.filename is required;
     has Str $.url is required;
     has Pair @!dl-headers;
-    has Cro::HTTP::Client $.client = .new(:http<1.1>);  # KrakenFiles has bad thruput with http/2
+    has Cro::HTTP::Client $.client = .new(:http<1.1>);  # KrakenFiles has bad thruput with http/2, and GoFile requires it for downloads
 
     method pathname { 'working/' ~ $.filename }
     method gist { "download-from($.url)" }
