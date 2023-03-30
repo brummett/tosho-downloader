@@ -23,7 +23,10 @@ role FileDownloader {
         react {
             my $url = Cro::Uri.parse($.url);
             whenever $.client.get($url, user-agent => $user-agent) -> $response {
-                if $response.content-type.type-and-subtype eq 'text/html' {
+                if $response.content-type.type-and-subtype eq 'text/html'
+                    or
+                   $response.content-type.type-and-subtype eq 'application/json'
+                {
                     my $dl-uri = self.get-download-link($response);
                     self.do-download-file($dl-uri);
                 }
