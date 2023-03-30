@@ -14,32 +14,35 @@ use Cro::Uri;
 
 unit class Task::GofileDownloader does FileDownloader is Task;
 
-has Str $!dl-token;
+my Str $dl-token;
 
 # The url we're created with looks like https://gofile.io/d/fileId which would
 # generate a javascript-driven page if you pointed a browser at it.
 # Instead, we'll use that "fileId" and use GoFile's API
 submethod TWEAK {
-    $!dl-token = self!get-dl-token();
+    $dl-token = self!get-dl-token();
     my $file-id = (Cro::Uri.parse($!url).path-segments)[*-1];
     # websiteToken seems to be required, but isn't used for anything
-    $!url = "https://api.gofile.io/getContent?contentId=$file-id&token=$!dl-token&websiteToken=12345";
+    $!url = "https://api.gofile.io/getContent?contentId=$file-id&token=$dl-token&websiteToken=12345";
     say "    via API at $!url";
 }
     
 method !get-dl-token {
-    my $response = await $.client.get('https://api.gofile.io/createAccount');
-    my $json-data = await $response.body();
-    # looks like: {data => {token => 0eoxBkYGFYmHZ43mxkJpY2vWLeCYW5SV}, status => ok}
+    unless $dl-token {
+        my $response = await $.client.get('https://api.gofile.io/createAccount');
+        my $json-data = await $response.body();
+        # looks like: {data => {token => 0eoxBkYGFYmHZ43mxkJpY2vWLeCYW5SV}, status => ok}
 
-    # The original hit https://api.gofile.io/getAccountDetails?token=$api-token
-    # to check the status of the account before proceeding. Its response is:
-    # {data => {credit => 0, currency => USD, currencySign => $, email => guest1675367646@gofile.io,
-    #           filesCount => 0, rootFolder => 96ed5b07-dd08-44e4-bd5d-f73745ee25fb, tier => guest,
-    #           token => 0eoxBkYGFYmHZ43mxkJpY2vWLeCYW5SV, total30DDLTraffic => 0, totalSize => 0},
-    #   status => ok}
+        # The original hit https://api.gofile.io/getAccountDetails?token=$api-token
+        # to check the status of the account before proceeding. Its response is:
+        # {data => {credit => 0, currency => USD, currencySign => $, email => guest1675367646@gofile.io,
+        #           filesCount => 0, rootFolder => 96ed5b07-dd08-44e4-bd5d-f73745ee25fb, tier => guest,
+        #           token => 0eoxBkYGFYmHZ43mxkJpY2vWLeCYW5SV, total30DDLTraffic => 0, totalSize => 0},
+        #   status => ok}
 
-    return $json-data<data><token>;
+        $dl-token = $json-data<data><token>;
+    }
+    return $dl-token;
 }
 
 method get-download-link(Cro::HTTP::Response $response --> Cro::Uri) {
@@ -83,7 +86,7 @@ method get-download-link(Cro::HTTP::Response $response --> Cro::Uri) {
     }
 
     @!dl-headers =
-        Cookie => "accountToken=$!dl-token",
+        Cookie => "accountToken=$dl-token",
         'Accept-Encoding' => "gzip, deflate, br",
         #'User-Agent' => $user-agent,
         'Accept' => '*/*',
