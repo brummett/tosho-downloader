@@ -12,6 +12,7 @@ role FileDownloader {
 
     has Str $.filename is required;
     has Str $.url is required;
+    has Pair @!dl-headers;
     has Cro::HTTP::Client $.client = .new(:http<1.1>);  # KrakenFiles has bad thruput with http/2
 
     method pathname { 'working/' ~ $.filename }
@@ -50,7 +51,7 @@ role FileDownloader {
         say "Downloading from $.url =>  file $dl-uri";
         my $start-time = now;
 
-        my $response = await $.client.get($dl-uri, user-agent => $user-agent);
+        my $response = await $.client.get($dl-uri, user-agent => $user-agent, headers => @!dl-headers);
         self.pathname.IO.dirname.IO.mkdir;
         my $fh = open self.pathname, :w, :bin;
 
