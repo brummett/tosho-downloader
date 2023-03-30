@@ -55,7 +55,7 @@ role FileDownloader {
         self.pathname.IO.dirname.IO.mkdir;
         my $fh = open self.pathname, :w, :bin;
 
-        my $progress-timer = Supply.interval(30, delay => 10);
+        my $progress-timer = Supply.interval(30, 10);
         my $bytes = 0;
         react {
             whenever $response.body-byte-stream -> $chunk {
