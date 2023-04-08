@@ -141,6 +141,11 @@ class Task::ToshoDownload is Task {
     # might be split into parts
     method queue-download-multiple-files(Str $title, @files) {
         for @files -> $file {
+            if not $file<links> {
+                $*ERR.say: "***** $file<filename> has no download links";
+                next;
+            }
+
             my $final-filename = IO::Spec::Unix.catpath($, $title, $file<filename>);
             my $dl-sources = FileDownloadSources.new(filename           => $file<filename>,
                                                      download-pathname  => $final-filename,
