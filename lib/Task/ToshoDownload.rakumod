@@ -63,7 +63,7 @@ class Task::ToshoDownload is Task {
             return 'GoFile' if %!alternatives<GoFile>:exists and %!alternatives<KrakenFiles>:!exists;
 
             # Otherwise, just pick one
-            return <GoFile KrakenFiles>.pick;
+            return %download-classes.keys.pick;
         }
     }
 
