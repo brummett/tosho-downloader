@@ -16,14 +16,17 @@ unit class Task::GofileDownloader does FileDownloader is Task;
 
 my Str $dl-token;
 
+# websiteToken is used in the getContent API endpoint.  This is a copy of the
+# value used in the web frontend, in the file alljs.js
+my Str $website-token = 'fghij';
+
 # The url we're created with looks like https://gofile.io/d/fileId which would
 # generate a javascript-driven page if you pointed a browser at it.
 # Instead, we'll use that "fileId" and use GoFile's API
 submethod TWEAK {
     $dl-token = self!get-dl-token();
     my $file-id = (Cro::Uri.parse($!url).path-segments)[*-1];
-    # websiteToken seems to be required, but isn't used for anything
-    $!url = "https://api.gofile.io/getContent?contentId=$file-id&token=$dl-token&websiteToken=12345";
+    $!url = "https://api.gofile.io/getContent?contentId=$file-id&token=$dl-token&websiteToken=$website-token";
     say "    via API at $!url";
 }
     
