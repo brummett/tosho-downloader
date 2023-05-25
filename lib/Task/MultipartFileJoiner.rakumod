@@ -30,33 +30,34 @@ method run {
 
     $.filename.IO.dirname.IO.mkdir;
 
+    my $final-fh;
+    if @.file-part-tasks.elems > 1 {
+        # Join all the parts together here
+        $final-fh = open $.filename, :w, :bin;
+    }
+
+    my $md5 = MD5;
+    for @.file-part-tasks -> $task {
+        say "  ",$task.pathname;
+        react {
+            whenever $task.pathname.IO.open(:r, :bin).Supply -> $chunk {
+                $md5.write($chunk);
+                $final-fh.write($chunk) if $final-fh;
+            }
+        }
+    }
+    $final-fh.close if $final-fh;
+
+    say "  ==> $.filename";
+    if $md5.hex ne $!md5 {
+           note "****   $.filename md5 differs!!\n        Got      { $md5.hex }\n        Expected $!md5";
+    }
+
     if @.file-part-tasks.elems == 1 {
         # just one part, move the file
         say "  was just one part.  Moving to $.filename";
         rename @.file-part-tasks[0].pathname, $.filename, :createonly;
-
     } else {
-
-        # Join all the parts together
-        my $final-fh = open $.filename, :w, :bin;
-        my $md5 = MD5;
-
-        for @.file-part-tasks -> $task {
-            say "  ",$task.pathname;
-            react { 
-                whenever $task.pathname.IO.open(:r, :bin).Supply -> $chunk {
-                    $md5.write($chunk);
-                    $final-fh.write($chunk);
-                }
-            }
-        }
-        $final-fh.close;
-
-        say "  ==> $.filename";
-        if $md5.hex ne $!md5 {
-            note "****   $.filename md5 differs!!\n        Got      { $md5.hex }\n        Expected $!md5";
-        }
-
         unlink $_.pathname for @.file-part-tasks;
     }
 
