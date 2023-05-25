@@ -134,6 +134,9 @@ class Task::ToshoDownload is Task {
             when X::FileDownloadSources::NoSupportedSources {
                 $*ERR.say: "***** ",$_;
             }
+            when X::GofileDownloader::NoWebsiteToken {
+                $*ERR.say: "***** ",$_;
+            }
         }
     }
 
@@ -157,6 +160,9 @@ class Task::ToshoDownload is Task {
 
             CATCH {
                 when X::FileDownloadSources::NoSupportedSources {
+                    $*ERR.say: "***** ",$_;
+                }
+                when X::GofileDownloader::NoWebsiteToken {
                     $*ERR.say: "***** ",$_;
                 }
             }

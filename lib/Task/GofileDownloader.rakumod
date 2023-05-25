@@ -14,22 +14,45 @@ use Cro::Uri;
 
 unit class Task::GofileDownloader does FileDownloader is Task;
 
+class X::GofileDownloader::NoWebsiteToken is Exception {
+    has Str $.url;
+    method message { "Cannot get website token for $!url" }
+}
+
 my Str $dl-token;
 
-# websiteToken is used in the getContent API endpoint.  This is a copy of the
-# value used in the web frontend, in the file alljs.js
-my Str $website-token = 'fghij';
+# websiteToken is used in the getContent API endpoint.  They change it from
+# time-to-time, so its current value is found in the method !get-website-token()
+my Str $website-token;
 
 # The url we're created with looks like https://gofile.io/d/fileId which would
 # generate a javascript-driven page if you pointed a browser at it.
 # Instead, we'll use that "fileId" and use GoFile's API
 submethod TWEAK {
-    $dl-token = self!get-dl-token();
+    self!get-dl-token();
+    self!get-website-token();
+
     my $file-id = (Cro::Uri.parse($!url).path-segments)[*-1];
     $!url = "https://api.gofile.io/getContent?contentId=$file-id&token=$dl-token&websiteToken=$website-token";
     say "    via API at $!url";
 }
     
+method !get-website-token(--> Str) {
+    unless $website-token {
+        my $response = await $.client.get('https://gofile.io/dist/js/alljs.js');
+        my $js-code = await $response.body();
+
+        # The code contains a line that looks like:
+        # fetchData.websiteToken = "blahblah"
+        if $js-code and $js-code.decode() ~~ /'fetchData.websiteToken' \s* '=' \s* '"' $<token>=<-["]>+ '"'/ {
+            $website-token = ~$<token>;
+        } else {
+            $website-token = fail X::GofileDownloader::NoWebsiteToken.new(url => $!url);
+        }
+    }
+    return $website-token;
+}
+
 method !get-dl-token {
     unless $dl-token {
         my $response = await $.client.get('https://api.gofile.io/createAccount');
