@@ -49,9 +49,6 @@ method run {
     $final-fh.close if $final-fh;
 
     say "  ==> $.filename";
-    if $md5.hex ne $!md5 {
-           note "****   $.filename md5 differs!!\n        Got      { $md5.hex }\n        Expected $!md5";
-    }
 
     if @.file-part-tasks.elems == 1 {
         # just one part, move the file
@@ -61,6 +58,12 @@ method run {
         unlink $_.pathname for @.file-part-tasks;
     }
 
+    if $md5.hex ne $!md5 {
+        note "****   $.filename md5 differs!!\n        Got      { $md5.hex }\n        Expected $!md5";
+        my $dirname = $.filename.IO.dirname;
+        my $basename = $.filename.IO.basename;
+        rename $.filename, "{$dirname}/badsum-{$basename}";
+    }
     self.done;
 }
 
