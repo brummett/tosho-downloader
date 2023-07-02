@@ -92,7 +92,9 @@ class Task::ToshoDownload is Task {
             my $data = await $response.body();
 
             # status can be "complete", "skipped", "processing"
-            if $data<status> ne 'complete' {
+            # "complete_partial" means some but not all files in a group were fetched,
+            # probably as part of a manually-triggered download
+            if $data<status> ne 'complete' and $data<status> ne 'complete_partial' {
                 say "$data<title> is not yet complete: $data<status>";
                 self.done;
                 return;
