@@ -1,7 +1,7 @@
 #!/usr/local/bin/raku
 
 use Worker;
-use ToshoFeed;
+use ToshoFeedSearch;
 use Task::ToshoDownload;
 
 sub MAIN(
@@ -11,8 +11,8 @@ sub MAIN(
     mkdir 'working';
 
     say "hi";
-    my %feed := TitleToToshoId.new();
     my $work-queue = Channel.new();
+    my $searcher = ToshoFeedSearch.new();
 
     #my @workers = map { Worker.new(id => $_, queue => $work-queue) }, ^$workers;
     my @workers = do for ^$workers -> $id {
@@ -24,19 +24,13 @@ sub MAIN(
 
     react {
         whenever $*IN.lines.Supply -> $line {
-            CATCH {
-                when X::Tosho::NotFound {
-                    note "*** Didn't find { .name } in the index";
-                }
-            }
-
             my $trimmed = $line.trim;
             say "read line: $trimmed";
 
             if $trimmed.chars > 1 {
-                my $id = %feed{$trimmed};
-                say "title $trimmed is id $id";
+                my $id = $searcher.search-for($trimmed);
                 if $id {
+                    say "title $trimmed is id $id";
                     my $task = Task::ToshoDownload.new(queue => $work-queue, id => $id, name => $trimmed);
                     $work-queue.send($task);
                 }
