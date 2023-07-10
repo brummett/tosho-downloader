@@ -21,39 +21,34 @@ role FileDownloader {
 
     method run {
         say "Trying to download file from $.url";
-        react {
-            my $url = Cro::Uri.parse($.url);
 
-            my $num-retries = 5;
-            while $num-retries > 0 {
-                whenever $.client.get($url, user-agent => $user-agent) -> $response {
-                    if $response.content-type.type-and-subtype eq 'text/html'
-                        or
-                       $response.content-type.type-and-subtype eq 'application/json'
-                    {
-                        my $dl-uri = self.get-download-link($response);
-                        self.do-download-file($dl-uri);
-                    }
-                    #QUIT {
-                    #    default {
-                    #        note "**** $.filename: $url failed: " ~ .message;
-                    #    }
-                    #}
-                    CATCH {
-                        when X::Cro::HTTP::Client::Timeout {
-                            note "* Timeout when getting $.filename from $url: " ~ .message;
-                            $num-retries--;
-                            redo;
-                        }
-                        default {
-                            note "**** $.filename: $url failed: " ~ .message;
-                            last;
-                        }
-                    }
-                }
-                last;
+        my $num-retries = 5;
+        while $num-retries > 0 {
+            my $url = Cro::Uri.parse($.url);
+            my $response = await $.client.get($url, user-agent => $user-agent);
+            if $response.content-type.type-and-subtype eq 'text/html'
+                or
+               $response.content-type.type-and-subtype eq 'application/json'
+            {
+                my $dl-uri = self.get-download-link($response);
+                self.do-download-file($dl-uri);
             }
+            CATCH {
+                when X::Cro::HTTP::Client::Timeout {
+                    note "* Timeout when getting $.filename from $url: " ~ .message;
+                    $num-retries--;
+                    # This redo dies with the error:
+                    # redo without loop construct
+                    redo;
+                }
+                default {
+                    note "**** $.filename: $url failed: " ~ .message;
+                    last;
+                }
+            }
+            last; # exit the while retries loop
         }
+
         say "Download from $.url is done";
         self.done;
     }
