@@ -1,16 +1,12 @@
 use Cro::HTTP::Client;
 use Cro::Uri;
 
-class X::Tosho::NotFound is Exception { has Str $.name }
 
-my $web-client = Cro::HTTP::Client.new(base-uri => 'https://feed.animetosho.org/json',
-                                       :http<1.1>,
-                                       timeout => { connection => 10, headers => 10 });
-
-# Look up a tosho torrent id given a title
-class TitleToToshoId does Associative[Str, Int] {
-    my $max-page-tries = 10;
-
+# Look up a tosho torrent id given a title from the raw/linear JSON feed API
+class ToshoFeed  {
+    has $web-client = Cro::HTTP::Client.new(base-uri => 'https://feed.animetosho.org/json',
+                                            :http<1.1>,
+                                            timeout => { connection => 10, headers => 10 });
     has Int %!index;
     has Int $!max-id;
     has Int $!min-id;
@@ -22,9 +18,9 @@ class TitleToToshoId does Associative[Str, Int] {
         self.get-feed-page(1);
     }
 
-    multi method AT-KEY( ::?CLASS:D: Str $name --> Int) {
+    method search-for(Str $name --> Int) {
         say "Looking up ID for name $name...";
-        my $page-tries = $max-page-tries;
+        my $page-tries = 10;
         my $page = $!last-page-retrieved == 1 ?? 2 !! $!last-page-retrieved;
 
         # This is not thread-safe yet, but it should be ok as long
@@ -38,8 +34,6 @@ class TitleToToshoId does Associative[Str, Int] {
             }
         }
         say "    Done refreshing feed";
-
-        die X::Tosho::NotFound.new(:$name) unless %!index{$name}:exists;
 
         %!index{$name};
     }

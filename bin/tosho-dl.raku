@@ -1,6 +1,7 @@
 #!/usr/local/bin/raku
 
 use Worker;
+use ToshoFeed;
 use ToshoFeedSearch;
 use Task::ToshoDownload;
 
@@ -13,6 +14,7 @@ sub MAIN(
     say "hi";
     my $work-queue = Channel.new();
     my $searcher = ToshoFeedSearch.new();
+    my $linear-feed = ToshoFeed.new();
 
     #my @workers = map { Worker.new(id => $_, queue => $work-queue) }, ^$workers;
     my @workers = do for ^$workers -> $id {
@@ -29,6 +31,7 @@ sub MAIN(
 
             if $trimmed.chars > 1 {
                 my $id = $searcher.search-for($trimmed);
+                $id = $linear-feed.search-for($trimmed) unless $id;
                 if $id {
                     say "title $trimmed is id $id";
                     my $task = Task::ToshoDownload.new(queue => $work-queue, id => $id, name => $trimmed);
