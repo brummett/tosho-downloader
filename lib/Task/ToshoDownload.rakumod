@@ -57,13 +57,8 @@ class Task::ToshoDownload is Task {
         # Returns a key in the %alternatives hash for which source to download from,
         # which must be a key in %download-classes
         method !pick-download-source( --> Str) {
-            # GoFile and KrakenFiles seem equivalent.  Pick one of them if
-            # only one is available.
-            return 'KrakenFiles' if %!alternatives<KrakenFiles>:exists and %!alternatives<GoFile>:!exists;
-            return 'GoFile' if %!alternatives<GoFile>:exists and %!alternatives<KrakenFiles>:!exists;
-
-            # Otherwise, just pick one
-            return %download-classes.keys.pick;
+            # Intersect what we support and what's available, then pick one
+            return (%download-classes (&) %!alternatives).pick;
         }
     }
 
