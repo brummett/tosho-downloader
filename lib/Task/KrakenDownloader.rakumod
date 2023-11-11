@@ -54,3 +54,9 @@ method get-download-link(Cro::HTTP::Response $response --> Cro::Uri) {
 
     return Cro::Uri.parse($dl-info<url>);
 }
+
+method do-download-request(Cro::Uri $uri --> Promise) {
+    return $.client.get($uri,
+                        user-agent => $!user-agent,
+                    );
+}

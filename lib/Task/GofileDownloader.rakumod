@@ -14,6 +14,8 @@ use Cro::Uri;
 
 unit class Task::GofileDownloader does FileDownloader is Task;
 
+has Pair @!dl-headers;
+
 class X::GofileDownloader::NoWebsiteToken is Exception {
     has Str $.url;
     method message { "Cannot get website token for $!url" }
@@ -127,4 +129,11 @@ method get-download-link(Cro::HTTP::Response $response --> Cro::Uri) {
     
     say "    file DL is at $dl-link";
     return Cro::Uri.parse($dl-link);
+}
+
+method do-download-request(Cro::Uri $uri --> Promise) {
+    return $.client.get($uri,
+                        user-agent => $!user-agent,
+                        headers => @!dl-headers,
+                    );
 }
