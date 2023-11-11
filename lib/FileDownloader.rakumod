@@ -48,7 +48,7 @@ role FileDownloader {
                     redo;
                 }
                 default {
-                    note "**** $.filename: $url failed: " ~ .message;
+                    note "**** $.filename: $url failed with a { $_.^name } exception: " ~ .message ~ "\n" ~ .backtrace;
                     last;
                 }
             }
