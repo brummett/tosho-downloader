@@ -14,6 +14,7 @@ class Task::ToshoDownload is Task {
     class FileDownloadSources {
         use Task::KrakenDownloader;
         use Task::GofileDownloader;
+        use Task::ClickNUploadDownloader;
 
         # The name for this file
         has Str $.filename is required;
@@ -25,7 +26,9 @@ class Task::ToshoDownload is Task {
         has %.alternatives is required;
 
         my %download-classes = KrakenFiles => Task::KrakenDownloader,
-                               GoFile => Task::GofileDownloader;
+                               GoFile => Task::GofileDownloader,
+                               ClickNUpload => Task::ClickNUploadDownloader,
+                                ;
 
         submethod BUILD(:$!filename, :$!download-pathname, :%!alternatives) {
             unless any(%!alternatives{ %download-classes.keys }:exists) {
