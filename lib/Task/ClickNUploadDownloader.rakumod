@@ -85,10 +85,7 @@ method !handle-captcha-page(Cro::HTTP::Response $response --> Associative) {
 method !handle-download-page(Cro::HTTP::Response $response --> Cro::Uri) {
     my $dom = DOM::Tiny.parse(await $response.body);
     my $dl-link = $dom.at('a.downloadbtn');
-    unless $dl-link {
-        say "Didn't find DL link at { $response.request.uri }";
-        return;
-    }
+    die "Didn't find DL link at { $response.request.uri }" unless $dl-link;
 
     # The ultimate DL link contains spaces.  We need to urlencode just that
     # part of the URL.  Luckily, we received the filename as an input in the
