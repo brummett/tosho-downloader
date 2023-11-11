@@ -15,6 +15,7 @@ class Task::ToshoDownload is Task {
         use Task::KrakenDownloader;
         use Task::GofileDownloader;
         use Task::ClickNUploadDownloader;
+        use Task::UppitDownloader;
 
         # The name for this file
         has Str $.filename is required;
@@ -28,6 +29,7 @@ class Task::ToshoDownload is Task {
         my %download-classes = KrakenFiles => Task::KrakenDownloader,
                                GoFile => Task::GofileDownloader,
                                ClickNUpload => Task::ClickNUploadDownloader,
+                               Uppit => Task::UppitDownloader,
                                 ;
 
         submethod BUILD(:$!filename, :$!download-pathname, :%!alternatives) {
