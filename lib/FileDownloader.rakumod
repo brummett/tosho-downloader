@@ -13,6 +13,7 @@ role FileDownloader {
     has Str $.filename is required;
     has Str $.url is required;
     has Pair @!dl-headers;
+    has Bool $!dl-ca-insecure = False;
     has Cro::HTTP::Client $.client = .new(:http<1.1>);  # KrakenFiles has bad thruput with http/2, and GoFile requires it for downloads
 
     method pathname { 'working/' ~ $.filename }
@@ -57,7 +58,8 @@ role FileDownloader {
         say "Downloading from $.url =>  file $dl-uri";
         my $start-time = now;
 
-        my $response = await $.client.get($dl-uri, user-agent => $user-agent, headers => @!dl-headers);
+        my $ca-params = ca => { :insecure } if $!dl-ca-insecure;
+        my $response = await $.client.get($dl-uri, |$ca-params, user-agent => $user-agent, headers => @!dl-headers);
         my $total-size = $response.header('Content-Length');
         self.pathname.IO.dirname.IO.mkdir;
         my $fh = open self.pathname, :w, :bin;
