@@ -19,15 +19,6 @@ unit class Task::ClickNUploadDownloader does FileDownloader is Task;
 
 has Str $!fname;
 
-# After resolving the DL link, doing a get() on it dies with:
-#    X::IO::Socket::Async::SSL::Verification+{X::Await::Died}+{X::Promise::Broken} exception:
-#    Server certificate verification failed: unable to get local issuer certificate
-# wget also complains:
-#    ERROR: cannot verify mover04.clicknupload.net's certificate, issued by ‘CN=R3,O=Let's Encrypt,C=US’:
-#   Unable to locally verify the issuer's authority.
-# The workaround is to do the get with: ca => { :insecure }
-submethod TWEAK() { $!dl-ca-insecure = True }
-
 method get-download-link(Cro::HTTP::Response $response --> Cro::Uri) {
     my $original-uri = $response.request.uri;
 
@@ -55,6 +46,13 @@ method get-download-link(Cro::HTTP::Response $response --> Cro::Uri) {
     my $l = self!handle-download-page($form2-response);
     die "Couldn't find download link via $original-uri" unless $l;
     return $l;
+}
+
+method do-download-request(Cro::Uri $uri --> Promise) {
+    return $.client.get($uri,
+                        ca => { :insecure },
+                        user-agent => $!user-agent,
+                    );
 }
 
 method !handle-landing-page(Cro::HTTP::Response $response --> Associative) {

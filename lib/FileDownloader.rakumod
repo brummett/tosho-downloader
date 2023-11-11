@@ -6,19 +6,24 @@ use Cro::Uri;
 # and we should try another
 #class X::FileDownloader::SourceBandwidthExceeded { }
 
-constant $user-agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:108.0) Gecko/20100101 Firefox/108.0';
-
 role FileDownloader {
 
     has Str $.filename is required;
     has Str $.url is required;
-    has Pair @!dl-headers;
-    has Bool $!dl-ca-insecure = False;
+    has $!user-agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:108.0) Gecko/20100101 Firefox/108.0';
+
     has Cro::HTTP::Client $.client = .new(:http<1.1>);  # KrakenFiles has bad thruput with http/2, and GoFile requires it for downloads
 
     method pathname { 'working/' ~ $.filename }
     method gist { "download-from($.url)" }
+
+    # Take the response from get()ing the link AnimeTosho referred us to, and
+    # returns a url that will allow us to download from
     method get-download-link(Cro::HTTP::Response $response --> Cro::Uri) { ... }
+
+    # Takes the uri returned by get-download-link, and performs the request
+    # to get the file
+    method do-download-request(Cro::Uri $uri --> Promise) { ... }
 
     method run {
         say "Trying to download file from $.url";
@@ -26,7 +31,7 @@ role FileDownloader {
         my $num-retries = 5;
         while $num-retries > 0 {
             my $url = Cro::Uri.parse($.url);
-            my $response = await $.client.get($url, user-agent => $user-agent);
+            my $response = await $.client.get($url, user-agent => $!user-agent);
             if $response.content-type.type-and-subtype eq 'text/html'
                 or
                $response.content-type.type-and-subtype eq 'application/json'
@@ -58,8 +63,7 @@ role FileDownloader {
         say "Downloading from $.url =>  file $dl-uri";
         my $start-time = now;
 
-        my $ca-params = ca => { :insecure } if $!dl-ca-insecure;
-        my $response = await $.client.get($dl-uri, |$ca-params, user-agent => $user-agent, headers => @!dl-headers);
+        my Cro::HTTP::Response $response = await self.do-download-request($dl-uri);
         my $total-size = $response.header('Content-Length');
         self.pathname.IO.dirname.IO.mkdir;
         my $fh = open self.pathname, :w, :bin;
