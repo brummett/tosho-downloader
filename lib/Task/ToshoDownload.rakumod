@@ -16,6 +16,7 @@ class Task::ToshoDownload is Task {
         use Task::GofileDownloader;
         use Task::ClickNUploadDownloader;
         use Task::UppitDownloader;
+        use Task::DownloadggDownloader;
 
         # The name for this file
         has Str $.filename is required;
@@ -30,6 +31,7 @@ class Task::ToshoDownload is Task {
                                GoFile => Task::GofileDownloader,
                                ClickNUpload => Task::ClickNUploadDownloader,
                                Uppit => Task::UppitDownloader,
+                               DownloadGG => Task::DownloadggDownloader,
                                 ;
 
         submethod BUILD(:$!filename, :$!download-pathname, :%!alternatives) {
