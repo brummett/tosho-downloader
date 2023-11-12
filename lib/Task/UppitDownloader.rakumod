@@ -45,7 +45,7 @@ method do-download-request(Cro::Uri $uri --> Promise) {
 
 method !handle-landing-page(Cro::HTTP::Response $response --> Associative) {
     my $dom = DOM::Tiny.parse(await $response.body);
-    my %inputs = self!extract-inputs-from-form($dom.at('form[name=pre]'));
+    my %inputs = self.extract-inputs-from-form($dom.at('form[name=pre]'));
     return %inputs;
 }
 
@@ -66,10 +66,4 @@ method !handle-download-page(Cro::HTTP::Response $response --> Cro::Uri) {
     say "  encoded as $dl-url";
 
     return Cro::Uri.parse($dl-url);
-}
-
-method !extract-inputs-from-form(DOM::Tiny $form --> Associative) {
-    my %inputs = $form.find('input')
-                      .map(-> $input { $input.attr('name') => $input.attr('value') });
-    return %inputs;
 }
