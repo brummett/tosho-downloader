@@ -64,7 +64,7 @@ method do-download-request(Cro::Uri $uri --> Promise) {
 
 method !handle-landing-page(Cro::HTTP::Response $response --> Associative) {
     my $dom = DOM::Tiny.parse(await $response.body);
-    my %inputs = self!extract-inputs-from-form($dom.at('.download form'));
+    my %inputs = self.extract-inputs-from-form($dom.at('.download form'));
     return %inputs;
 }
 
@@ -76,7 +76,7 @@ method !handle-captcha-page(Cro::HTTP::Response $response --> Associative) {
     my $form = $dom.at('form[name=F1]');
     my $captcha = self!solve-captcha($form);
 
-    my %inputs = self!extract-inputs-from-form($form);
+    my %inputs = self.extract-inputs-from-form($form);
     %inputs<code> = $captcha;
     %inputs<adblock_detected> = '0';
     return %inputs;
@@ -97,12 +97,6 @@ method !handle-download-page(Cro::HTTP::Response $response --> Cro::Uri) {
     say "  encoded as $dl-url";
 
     return Cro::Uri.parse($dl-url);
-}
-
-method !extract-inputs-from-form(DOM::Tiny $form --> Associative) {
-    my %inputs = $form.find('input')
-                      .map(-> $input { $input.attr('name') => $input.attr('value') });
-    return %inputs;
 }
 
 method !handle-countdown(DOM::Tiny $dom) {

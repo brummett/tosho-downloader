@@ -1,6 +1,7 @@
 use Cro::HTTP::Response;
 use Cro::HTTP::Client;
 use Cro::Uri;
+use DOM::Tiny;
 
 # Represents when there are too many concurrent downloads from a source
 # and we should try another
@@ -95,4 +96,12 @@ role FileDownloader {
         my $pct = ($bytes / $total-size) * 100;
         printf("%s $.filename %0.2f MB %0.2f KB/s %0.1f%%\n", $message, $MB, $k-per-sec, $pct);
     }
+
+    # A method used by many downloaders to extract input elements
+    method extract-inputs-from-form(DOM::Tiny $form --> Associative) {
+        my %inputs = $form.find('input')
+                          .map(-> $input { $input.attr('name') => $input.attr('value') });
+        return %inputs;
+    }
+
 }
