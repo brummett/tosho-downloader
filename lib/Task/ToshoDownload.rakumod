@@ -182,11 +182,12 @@ class Task::ToshoDownload is Task {
 
         start {
             await @promises;
-            say "All parts of $filename are finished, queueing joiner task";
-            $.queue.send(Task::MultipartFileJoiner.new(filename => $filename,
+            say "All parts of $filename are finished, running joiner task";
+            my $joiner = Task::MultipartFileJoiner.new(filename => $filename,
                                                        file-part-tasks => @dl-tasks,
                                                        md5 => $md5,
-                                                       queue => self.queue));
+                                                       queue => self.queue);
+            $joiner.run()
         }
     }
 
