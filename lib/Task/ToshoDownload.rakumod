@@ -177,11 +177,8 @@ class Task::ToshoDownload is Task {
         my @dl-tasks is Array[FileDownloader] = $dl-sources.get-download-tasks();
         say "\t$filename: { @dl-tasks.elems } parts";
 
-        my @promises;
-        for @dl-tasks -> $dl-task {
-            @promises.push($dl-task.is-done);
-            $.queue.send($dl-task);
-        }
+        my @promises = @dl-tasks.map({ .is-done });
+        $.queue.send($_) for @dl-tasks;
 
         start {
             await @promises;
