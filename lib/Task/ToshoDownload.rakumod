@@ -174,6 +174,11 @@ class Task::ToshoDownload is Task {
     }
 
     method queue-download-one-of-the-files(Str :$filename, Str :$md5, FileDownloadSources :$dl-sources) {
+        if $filename.IO ~~ :e {
+            say "Skipping $filename because it already exists";
+            return;
+        }
+
         my @dl-tasks is Array[FileDownloader] = $dl-sources.get-download-tasks();
         say "\t$filename: { @dl-tasks.elems } parts";
 
