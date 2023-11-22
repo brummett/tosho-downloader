@@ -18,22 +18,22 @@ class ToshoFeed  {
         self.get-feed-page(1);
     }
 
-    method search-for(Str $name --> Int) {
+    method search-for(Str $name, Bool :$cache-only = False --> Int) {
         say "Looking up ID for name $name...";
         my $page-tries = 10;
         my $page = $!last-page-retrieved == 1 ?? 2 !! $!last-page-retrieved;
 
         # This is not thread-safe yet, but it should be ok as long
         # as it's only used from the user-input loop
-        if not %!index{$name}:exists {
+        if not %!index{$name}:exists and not $cache-only {
             say "    Refreshing feed page 1...";
             self.get-feed-page(1);
             until (%!index{$name}:exists) or ($page-tries-- <= 0) {
                 say "    Refreshing feed page $page...";
                 self.get-feed-page($page++);
             }
+            say "    Done refreshing feed";
         }
-        say "    Done refreshing feed";
 
         %!index{$name};
     }

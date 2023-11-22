@@ -30,7 +30,8 @@ sub MAIN(
             say "read line: $trimmed";
 
             if $trimmed.chars > 1 {
-                my $id = $searcher.search-for($trimmed);
+                my $id = $linear-feed.search-for($trimmed, :cache-only);
+                $id = $searcher.search-for($trimmed) unless $id;
                 $id = $linear-feed.search-for($trimmed) unless $id;
                 if $id {
                     say "title $trimmed is id $id";
